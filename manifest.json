@@ -1,0 +1,19 @@
+{
+  "name": "Mis comidas",
+  "short_name": "Comidas",
+  "description": "Bitácora de comidas en este navegador.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7d1e1",
+  "theme_color": "#f7d1e1",
+  "lang": "es-CO",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7d1e1">
+  <meta name="description" content="Bitácora de comidas. Se guarda en este navegador, sin servidor.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Mis comidas</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip" href="#registrar">Saltar al registro</a>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <svg width="48" height="48" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="#f6a7c1" stroke="#794835" stroke-width="3"/>
+          <path d="M12 30h40c1 12-6 22-20 22S11 42 12 30z" fill="#f8f1d5" stroke="#794835" stroke-width="3"/>
+          <path d="M18 30c1-9 7-14 14-14s13 5 14 14" fill="none" stroke="#794835" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <h1>Mis comidas</h1>
+          <p class="today-date" id="today-date"></p>
+          <p class="lede">Se guarda en este navegador. Funciona sin conexión.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="btn" type="button" id="open-backup" aria-haspopup="dialog">Respaldo</button>
+        <button class="btn" type="button" id="open-settings" aria-haspopup="dialog">Ajustes</button>
+      </div>
+    </header>
+
+    <main>
+      <form class="card" id="registrar" autocomplete="off">
+        <div class="section-head">
+          <h2>Registrar</h2>
+        </div>
+        <p class="hint">La foto es opcional. Puedes guardar solo la foto, solo lo que escribiste, o las dos.</p>
+        <div class="top-actions photo-actions">
+          <label class="file-btn">
+            Tomar foto
+            <input id="camera-input" type="file" accept="image/*" capture="environment">
+          </label>
+          <label class="file-btn">
+            Galería
+            <input id="gallery-input" type="file" accept="image/*">
+          </label>
+        </div>
+        <div class="preview" id="preview" hidden>
+          <img id="preview-img" alt="Vista previa de la foto">
+          <button class="btn" type="button" id="remove-photo">Quitar foto</button>
+        </div>
+
+        <div class="field">
+          <span id="meal-label">Comida</span>
+          <div class="chips" role="group" aria-labelledby="meal-label">
+            <button class="chip" type="button" data-meal="desayuno" aria-pressed="false">Desayuno</button>
+            <button class="chip" type="button" data-meal="almuerzo" aria-pressed="false">Almuerzo</button>
+            <button class="chip" type="button" data-meal="cena" aria-pressed="false">Cena</button>
+            <button class="chip" type="button" data-meal="snack" aria-pressed="false">Snack</button>
+            <button class="chip" type="button" data-meal="otro" aria-pressed="false">Otro</button>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Qué comiste</span>
+          <input id="description" type="text" maxlength="2000" placeholder="Ej. arroz con pollo" enterkeyhint="done">
+        </label>
+        <label class="field">
+          <span>Porción</span>
+          <input id="portion" type="text" maxlength="200" placeholder="Ej. 1 plato, 200 g">
+        </label>
+        <div class="field">
+          <span id="hunger-label">Hambre <span class="hint">1 poca, 5 mucha</span></span>
+          <div class="hunger" role="group" aria-labelledby="hunger-label">
+            <button class="chip" type="button" data-hunger="1" aria-pressed="false">1</button>
+            <button class="chip" type="button" data-hunger="2" aria-pressed="false">2</button>
+            <button class="chip" type="button" data-hunger="3" aria-pressed="false">3</button>
+            <button class="chip" type="button" data-hunger="4" aria-pressed="false">4</button>
+            <button class="chip" type="button" data-hunger="5" aria-pressed="false">5</button>
+          </div>
+        </div>
+        <label class="field">
+          <span>Notas</span>
+          <textarea id="notes" maxlength="2000" placeholder="Opcional"></textarea>
+        </label>
+        <label class="field">
+          <span>Calorías (kcal)</span>
+          <input id="kcal" type="text" inputmode="decimal" maxlength="12" placeholder="Opcional" autocomplete="off">
+          <span class="hint">Tú las escribes. La app no las calcula ni busca nutrición.</span>
+        </label>
+        <p class="error" id="form-error" role="alert" hidden></p>
+        <div class="save-bar">
+          <button class="btn btn-save" type="submit" id="save-entry">Guardar</button>
+        </div>
+      </form>
+
+      <section class="card" id="today" aria-labelledby="today-heading">
+        <div class="section-head">
+          <h2 id="today-heading">Hoy</h2>
+          <p class="meta" id="today-count">0 comidas</p>
+        </div>
+        <p class="hint">Se muestra el día de hoy. El respaldo JSON incluye todo el historial.</p>
+        <p class="empty" id="today-empty">Aún no hay comidas hoy. Toma una foto o escribe qué comiste.</p>
+        <ul class="entries" id="today-list"></ul>
+      </section>
+    </main>
+
+    <footer class="footer" id="version">food-log v0.1.0</footer>
+  </div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form method="dialog">
+      <h2 id="settings-title">Ajustes</h2>
+      <p class="hint">food-log no consulta la hoja ni calcula calorías. Solo guarda el ID para más adelante.</p>
+      <label class="field">
+        <span>ID del archivo de overrides</span>
+        <input id="overrides-file-id" type="text" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="meta">ID actual: <span class="file-id" id="overrides-current"></span></p>
+      <div class="row">
+        <button class="btn btn-primary" type="button" id="save-overrides">Guardar ID</button>
+        <button class="btn" type="button" id="clear-overrides">Quitar ID</button>
+      </div>
+      <section id="drive-section">
+        <h3>Google Drive</h3>
+        <p class="hint" id="drive-note">Google Picker necesita un client id más adelante.</p>
+        <p class="hint" id="drive-status" hidden></p>
+      </section>
+      <button class="btn" type="submit" value="cancel">Cerrar</button>
+    </form>
+  </dialog>
+
+  <dialog id="backup-dialog" aria-labelledby="backup-title">
+    <form method="dialog">
+      <h2 id="backup-title">Respaldo</h2>
+      <p class="hint">Exporta o importa la bitácora completa en JSON, fotos incluidas. El archivo se queda en tu dispositivo.</p>
+      <button class="btn btn-primary" type="button" id="export-json">Exportar JSON</button>
+      <label class="btn">
+        Importar JSON
+        <input id="import-file" type="file" accept=".json,application/json" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">
+      </label>
+      <button class="btn" type="submit" value="cancel">Cerrar</button>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <h2 id="confirm-title">Eliminar</h2>
+      <p id="confirm-text"></p>
+      <div class="row">
+        <button class="btn" value="cancel">Cancelar</button>
+        <button class="btn btn-danger" id="confirm-ok" value="ok">Eliminar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="card app">Activa JavaScript para registrar comidas en este navegador.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
