@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APP_ID, DEFAULT_OVERRIDES_FILE_ID, GOOGLE_CLIENT_ID, STORAGE_KEY } from "../js/config.js";
+import {
+  APP_ID,
+  DEFAULT_MEALS_FILE_ID,
+  DEFAULT_OVERRIDES_FILE_ID,
+  GOOGLE_CLIENT_ID,
+  STORAGE_KEY,
+} from "../js/config.js";
 import {
   buildEntry,
   createEmptyEnvelope,
@@ -37,6 +43,8 @@ test("fresh envelope matches the shared shape and seeds the sheet id", () => {
   assert.deepEqual(envelope.data.entries, []);
   assert.equal(envelope.data.nutrition.overrides_file_id, DEFAULT_OVERRIDES_FILE_ID);
   assert.equal(envelope.data.nutrition.overrides_file_id, "1B7WyOstF7xqgAgSS_7u46aFyGOFLYCtUm4O2Nw8xcKo");
+  assert.equal(envelope.data.meals.file_id, DEFAULT_MEALS_FILE_ID);
+  assert.equal(envelope.data.meals.file_id, "1YQC6LvXllCqRzUpNJ3guYn1GXcHI3Ra6y6LtgPCZlD0");
   assert.deepEqual(envelope.data.settings, {});
   assert.equal(GOOGLE_CLIENT_ID, "");
   assert.equal(STORAGE_KEY, "food-log.save.v1");
@@ -93,7 +101,47 @@ test("file id parser accepts a raw id or a docs url and clear stays null", () =>
   assert.equal(parseFileId("   "), null);
   const cleared = createEmptyEnvelope();
   cleared.data.nutrition.overrides_file_id = null;
-  assert.equal(importEnvelope(cleared).envelope.data.nutrition.overrides_file_id, null);
+  cleared.data.meals.file_id = null;
+  const imported = importEnvelope(cleared).envelope;
+  assert.equal(imported.data.nutrition.overrides_file_id, null);
+  assert.equal(imported.data.meals.file_id, null);
+});
+
+test("older saves without data.meals keep entries and gain the default meals file id", () => {
+  const now = new Date("2026-10-02T12:00:00.000Z");
+  const entry = buildEntry({ description: "arepa", meal_type: "desayuno" }, now).entry;
+  const legacy = {
+    app_id: "food-log",
+    schema_version: 1,
+    saved_at: "2026-10-02T12:00:00.000Z",
+    data: {
+      entries: [entry],
+      nutrition: { overrides_file_id: null },
+      settings: { kept: true },
+    },
+  };
+  const imported = importEnvelope(legacy);
+  assert.equal(imported.ok, true);
+  assert.equal(imported.envelope.data.entries.length, 1);
+  assert.equal(imported.envelope.data.entries[0].id, entry.id);
+  assert.equal(imported.envelope.data.entries[0].description, "arepa");
+  assert.equal(imported.envelope.data.meals.file_id, DEFAULT_MEALS_FILE_ID);
+  assert.equal(imported.envelope.data.nutrition.overrides_file_id, null);
+  assert.deepEqual(imported.envelope.data.settings, { kept: true });
+
+  const storage = memoryStorage();
+  storage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+  const read = readEnvelope(storage);
+  assert.equal(read.status, "ok");
+  assert.equal(read.envelope.data.entries[0].description, "arepa");
+  assert.equal(read.envelope.data.meals.file_id, DEFAULT_MEALS_FILE_ID);
+
+  const cleared = createEmptyEnvelope();
+  cleared.data.meals.file_id = null;
+  const saved = persistEnvelope(cleared, memoryStorage(), now);
+  assert.equal(saved.ok, true);
+  assert.equal(importEnvelope(saved.envelope).envelope.data.meals.file_id, null);
+  assert.equal(importEnvelope({ ...legacy, data: { ...legacy.data, meals: { file_id: 12 } } }).error, "invalid_envelope");
 });
 
 test("import rejects the wrong app and persists the envelope under the save key", () => {
@@ -114,6 +162,7 @@ test("import rejects the wrong app and persists the envelope under the save key"
   assert.equal(roundtrip.app_id, "food-log");
   assert.equal(roundtrip.schema_version, 1);
   assert.equal(roundtrip.data.nutrition.overrides_file_id, DEFAULT_OVERRIDES_FILE_ID);
+  assert.equal(roundtrip.data.meals.file_id, DEFAULT_MEALS_FILE_ID);
   assert.equal(readEnvelope(storage).status, "ok");
   assert.equal(persistEnvelope(fresh.envelope, memoryStorage({ quota: true })).error, "quota");
 });

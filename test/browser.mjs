@@ -9,6 +9,7 @@ import { deflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SHEET = "1B7WyOstF7xqgAgSS_7u46aFyGOFLYCtUm4O2Nw8xcKo";
+const MEALS = "1YQC6LvXllCqRzUpNJ3guYn1GXcHI3Ra6y6LtgPCZlD0";
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -122,7 +123,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       save: JSON.parse(localStorage.getItem("food-log.save.v1")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.1.0");
+    assert.equal(shell.version, "food-log v0.1.1");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
@@ -131,6 +132,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.equal(shell.save.schema_version, 1);
     assert.deepEqual(shell.save.data.entries, []);
     assert.equal(shell.save.data.nutrition.overrides_file_id, SHEET);
+    assert.equal(shell.save.data.meals.file_id, MEALS);
     assert.deepEqual(shell.save.data.settings, {});
 
     await page.click("#save-entry");
@@ -215,6 +217,21 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
       return save.data.nutrition.overrides_file_id === id;
     }, {}, SHEET);
+    assert.equal(await page.$eval("#meals-file-id", (el) => el.value), MEALS);
+    await page.click("#clear-meals");
+    await page.waitForFunction(() => {
+      const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
+      return save.data.meals.file_id === null;
+    });
+    await page.$eval("#meals-file-id", (el, value) => {
+      el.value = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }, `https://docs.google.com/spreadsheets/d/${MEALS}/edit`);
+    await page.click("#save-meals");
+    await page.waitForFunction((id) => {
+      const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
+      return save.data.meals.file_id === id;
+    }, {}, MEALS);
     await page.click("#settings-dialog button[value='cancel']");
 
     const yesterday = new Date();
@@ -263,10 +280,12 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       return {
         stored: save.data.entries.map((entry) => entry.description),
         visible: [...document.querySelectorAll(".entry-title")].map((el) => el.textContent),
+        meals: save.data.meals.file_id,
       };
     });
     assert.deepEqual(afterImport.visible, ["Mandarina"]);
     assert.deepEqual(afterImport.stored.slice().sort(), ["Mandarina", "Sopa de ayer"]);
+    assert.equal(afterImport.meals, MEALS);
 
     const client = await page.createCDPSession();
     await client.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: downloadDir });
@@ -278,6 +297,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.equal(exported.app_id, "food-log");
     assert.equal(exported.schema_version, 1);
     assert.equal(exported.data.entries.length, 2);
+    assert.equal(exported.data.meals.file_id, MEALS);
 
     await page.setViewport({ width: 1280, height: 800 });
     const desktopOverflow = await page.evaluate(() => (

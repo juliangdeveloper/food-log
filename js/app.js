@@ -28,6 +28,8 @@ const todayCount = $("today-count");
 const todayDate = $("today-date");
 const overridesInput = $("overrides-file-id");
 const overridesCurrent = $("overrides-current");
+const mealsInput = $("meals-file-id");
+const mealsCurrent = $("meals-current");
 const driveNote = $("drive-note");
 const driveStatus = $("drive-status");
 const toastEl = $("toast");
@@ -200,6 +202,12 @@ function renderOverrides() {
   if (document.activeElement !== overridesInput) overridesInput.value = id || "";
 }
 
+function renderMeals() {
+  const id = envelope.data.meals.file_id;
+  mealsCurrent.textContent = id || "Ninguno";
+  if (document.activeElement !== mealsInput) mealsInput.value = id || "";
+}
+
 function confirmAction(message) {
   confirmText.textContent = message;
   confirmDialog.returnValue = "";
@@ -305,6 +313,25 @@ function onClearOverrides() {
   toast("ID quitado.");
 }
 
+function onSaveMeals() {
+  const id = parseFileId(mealsInput.value);
+  const next = structuredClone(envelope);
+  next.data.meals.file_id = id;
+  if (!commit(next)) return;
+  mealsInput.value = id || "";
+  renderMeals();
+  toast(id ? "ID actualizado." : "ID quitado.");
+}
+
+function onClearMeals() {
+  const next = structuredClone(envelope);
+  next.data.meals.file_id = null;
+  if (!commit(next)) return;
+  mealsInput.value = "";
+  renderMeals();
+  toast("ID quitado.");
+}
+
 function onExport() {
   const next = structuredClone(envelope);
   if (!commit(next)) return;
@@ -344,6 +371,7 @@ async function onImport(file) {
   resetForm();
   renderToday();
   renderOverrides();
+  renderMeals();
   const count = envelope.data.entries.length;
   toast(count === 1 ? "Bitácora importada · 1 comida." : `Bitácora importada · ${count} comidas.`);
 }
@@ -393,6 +421,7 @@ function boot() {
   todayDate.textContent = formatLongDate(new Date());
   renderToday();
   renderOverrides();
+  renderMeals();
   updateSaveLabel();
   setupDrive();
 
@@ -421,11 +450,14 @@ function boot() {
   });
   $("open-settings").addEventListener("click", () => {
     renderOverrides();
+    renderMeals();
     settingsDialog.showModal();
   });
   $("open-backup").addEventListener("click", () => backupDialog.showModal());
   $("save-overrides").addEventListener("click", onSaveOverrides);
   $("clear-overrides").addEventListener("click", onClearOverrides);
+  $("save-meals").addEventListener("click", onSaveMeals);
+  $("clear-meals").addEventListener("click", onClearMeals);
   $("export-json").addEventListener("click", onExport);
   $("import-file").addEventListener("change", (event) => {
     const file = event.target.files?.[0];
@@ -439,6 +471,7 @@ function boot() {
       envelope = next.envelope;
       renderToday();
       renderOverrides();
+      renderMeals();
     }
   });
   if ("serviceWorker" in navigator) {
