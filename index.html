@@ -109,13 +109,13 @@
       </section>
     </main>
 
-    <footer class="footer" id="version">food-log v0.1.0</footer>
+    <footer class="footer" id="version">food-log v0.1.1</footer>
   </div>
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form method="dialog">
       <h2 id="settings-title">Ajustes</h2>
-      <p class="hint">food-log no consulta la hoja ni calcula calorías. Solo guarda el ID para más adelante.</p>
+      <p class="hint">food-log no consulta las hojas ni calcula calorías. Solo guarda los ID para más adelante.</p>
       <label class="field">
         <span>ID del archivo de overrides</span>
         <input id="overrides-file-id" type="text" autocomplete="off" spellcheck="false">
@@ -124,6 +124,15 @@
       <div class="row">
         <button class="btn btn-primary" type="button" id="save-overrides">Guardar ID</button>
         <button class="btn" type="button" id="clear-overrides">Quitar ID</button>
+      </div>
+      <label class="field">
+        <span>ID del archivo de comidas</span>
+        <input id="meals-file-id" type="text" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="meta">ID actual: <span class="file-id" id="meals-current"></span></p>
+      <div class="row">
+        <button class="btn btn-primary" type="button" id="save-meals">Guardar ID</button>
+        <button class="btn" type="button" id="clear-meals">Quitar ID</button>
       </div>
       <section id="drive-section">
         <h3>Google Drive</h3>

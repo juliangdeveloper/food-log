@@ -26,6 +26,10 @@ test("pages assets are relative and the picker client id is empty", () => {
   assert.match(files["index.html"], /lang="es-CO"/);
   assert.equal(files["js/config.js"].includes('export const GOOGLE_CLIENT_ID = "";'), true);
   assert.match(files["js/config.js"], /TU_OVERRIDES_FILE_ID/);
+  assert.match(files["js/config.js"], /TU_MEALS_FILE_ID/);
+  assert.match(files["index.html"], /id="meals-file-id"/);
+  assert.match(files["index.html"], /ID del archivo de comidas/);
+  assert.match(files["index.html"], /food-log v0\.1\.1/);
   assert.match(files["index.html"], /Google Picker necesita un client id más adelante/);
   assert.match(files["js/drive.js"], /auth\/drive\.file/);
   assert.doesNotMatch(files["js/app.js"], /fetch\(/);

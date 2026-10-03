@@ -1,4 +1,4 @@
-import { APP_ID, DEFAULT_OVERRIDES_FILE_ID, SCHEMA_VERSION } from "./config.js";
+import { APP_ID, DEFAULT_MEALS_FILE_ID, DEFAULT_OVERRIDES_FILE_ID, SCHEMA_VERSION } from "./config.js";
 
 export const MEAL_TYPES = ["desayuno", "almuerzo", "cena", "snack", "otro"];
 
@@ -32,6 +32,7 @@ export function createEmptyEnvelope(now = new Date()) {
     data: {
       entries: [],
       nutrition: { overrides_file_id: DEFAULT_OVERRIDES_FILE_ID },
+      meals: { file_id: DEFAULT_MEALS_FILE_ID },
       settings: {},
     },
   };
@@ -156,6 +157,8 @@ export function normalizeEnvelope(raw) {
   }
   if (fileId == null || fileId === "") fileId = null;
   else if (typeof fileId !== "string") return null;
+  const mealsFileId = normalizeMealsFileId(raw.data.meals);
+  if (!mealsFileId.ok) return null;
   const settings = raw.data.settings;
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
   const savedAt = typeof raw.saved_at === "string" && !Number.isNaN(Date.parse(raw.saved_at))
@@ -168,9 +171,22 @@ export function normalizeEnvelope(raw) {
     data: {
       entries: raw.data.entries.map(normalizeEntry).filter(Boolean),
       nutrition: { overrides_file_id: fileId },
+      meals: { file_id: mealsFileId.fileId },
       settings: { ...settings },
     },
   };
+}
+
+function normalizeMealsFileId(meals) {
+  if (meals == null) return { ok: true, fileId: DEFAULT_MEALS_FILE_ID };
+  if (typeof meals !== "object" || Array.isArray(meals)) return { ok: false };
+  if (!Object.prototype.hasOwnProperty.call(meals, "file_id")) {
+    return { ok: true, fileId: DEFAULT_MEALS_FILE_ID };
+  }
+  const fileId = meals.file_id;
+  if (fileId == null || fileId === "") return { ok: true, fileId: null };
+  if (typeof fileId !== "string") return { ok: false };
+  return { ok: true, fileId };
 }
 
 export function importEnvelope(json) {
