@@ -29,10 +29,10 @@ test("pages assets are relative and the picker client id is empty", () => {
   assert.match(files["js/config.js"], /1YQC6LvXllCqRzUpNJ3guYn1GXcHI3Ra6y6LtgPCZlD0/);
   assert.match(files["index.html"], /id="meals-file-id"/);
   assert.match(files["index.html"], /ID del archivo de comidas/);
-  assert.match(files["index.html"], /food-log v0\.1\.2/);
+  assert.match(files["index.html"], /food-log v0\.1\.3/);
   assert.match(files["index.html"], /Google Picker necesita un client id más adelante/);
   assert.match(files["js/drive.js"], /auth\/drive\.file/);
-  assert.match(files["js/config.js"], /APP_VERSION = "0\.1\.2"/);
+  assert.match(files["js/config.js"], /APP_VERSION = "0\.1\.3"/);
   assert.doesNotMatch(files["js/config.js"], /IMAGE_MAX_EDGE|IMAGE_JPEG_QUALITY/);
   assert.doesNotMatch(files["js/app.js"], /fetch\(/);
   assert.doesNotMatch(files["js/app.js"], /compressImageFile|shrinkDataUrlForDrive|demasiado pesada/);
@@ -41,11 +41,9 @@ test("pages assets are relative and the picker client id is empty", () => {
   const imageJs = read("js/image.js");
   const modelJs = read("js/model.js");
   assert.doesNotMatch(imageJs, /(?:src|href)\s*=\s*["']\//);
-  assert.match(imageJs, /export async function shrinkDataUrlForDrive/);
-  assert.match(imageJs, /Must not run unless/);
-  assert.match(imageJs, /non-empty description and a kcal value/);
-  assert.match(imageJs, /500 KB/);
+  assert.match(imageJs, /export function readOriginalImageFile/);
+  assert.doesNotMatch(imageJs, /shrinkDataUrlForDrive|500 KB|Must not run unless|toBlob|canvas/);
   assert.doesNotMatch(imageJs, /1280|IMAGE_MAX_EDGE|IMAGE_JPEG_QUALITY/);
   assert.doesNotMatch(modelJs, /shrinkDataUrlForDrive|compressImageFile|4_000_000|4000000/);
-  assert.match(read("sw.js"), /food-log-v0\.1\.2/);
+  assert.match(read("sw.js"), /food-log-v0\.1\.3/);
 });
