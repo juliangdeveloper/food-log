@@ -15,7 +15,7 @@ const IMAGE_RE = /^data:image\/(?:jpeg|jpg|png|webp|gif);base64,[a-z0-9+/=\s]+$/
 export function isImageDataUrl(value) {
   if (typeof value !== "string") return false;
   const trimmed = value.trim();
-  return trimmed.length > 32 && trimmed.length <= 4_000_000 && IMAGE_RE.test(trimmed);
+  return trimmed.length > 32 && IMAGE_RE.test(trimmed);
 }
 
 function toIso(now) {

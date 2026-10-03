@@ -123,7 +123,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       save: JSON.parse(localStorage.getItem("food-log.save.v1")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.1.1");
+    assert.equal(shell.version, "food-log v0.1.2");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
@@ -178,9 +178,10 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     const gallery = await page.$("#gallery-input");
     await gallery.uploadFile(photoPath);
     await page.waitForFunction(() => document.getElementById("save-entry").textContent === "Confirmar foto");
+    const originalDataUrl = `data:image/png;base64,${readFileSync(photoPath).toString("base64")}`;
     await page.click("#save-entry");
     await page.waitForFunction(() => document.querySelectorAll("#today-list .entry").length === 1);
-    const photo = await page.evaluate(async () => {
+    const photo = await page.evaluate(async (expected) => {
       const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
       const entry = save.data.entries[0];
       const img = new Image();
@@ -188,16 +189,18 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       await img.decode();
       return {
         description: entry.description,
-        head: entry.image_data_url.slice(0, 23),
+        kcal: entry.kcal,
+        same: entry.image_data_url === expected,
         width: img.naturalWidth,
         height: img.naturalHeight,
         title: document.querySelector(".entry-title").textContent,
       };
-    });
+    }, originalDataUrl);
     assert.equal(photo.description, "");
-    assert.equal(photo.head.startsWith("data:image/jpeg;base64,"), true);
-    assert.equal(photo.width, 1280);
-    assert.ok(photo.height < 20);
+    assert.equal(photo.kcal, null);
+    assert.equal(photo.same, true);
+    assert.equal(photo.width, 2000);
+    assert.equal(photo.height, 20);
     assert.equal(photo.title, "Foto");
 
     await page.click("#open-settings");
