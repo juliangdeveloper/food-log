@@ -1,7 +1,7 @@
-// food-log v0.1.1 — static config. No secrets belong here.
+// food-log v0.1.2 — static config. No secrets belong here.
 export const APP_ID = "food-log";
 export const SCHEMA_VERSION = 1;
-export const APP_VERSION = "0.1.1";
+export const APP_VERSION = "0.1.2";
 export const STORAGE_KEY = "food-log.save.v1";
 
 // Tabla nutrición overrides Sheet. Seeded on a fresh save; the user can change or clear it.
@@ -17,6 +17,3 @@ export const GOOGLE_CLIENT_ID = "";
 
 // Optional browser API key for Picker. Leave empty unless you have one; never commit a secret.
 export const GOOGLE_API_KEY = "";
-
-export const IMAGE_MAX_EDGE = 1280;
-export const IMAGE_JPEG_QUALITY = 0.7;

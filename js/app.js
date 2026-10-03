@@ -1,6 +1,6 @@
 import { APP_VERSION, GOOGLE_CLIENT_ID, STORAGE_KEY } from "./config.js";
 import { pickSpreadsheet } from "./drive.js";
-import { compressImageFile } from "./image.js";
+import { readOriginalImageFile } from "./image.js";
 import {
   MEAL_LABELS,
   buildEntry,
@@ -221,14 +221,10 @@ function confirmAction(message) {
 
 async function onFile(file) {
   if (!file || busy) return;
-  if (file.size > 20 * 1024 * 1024) {
-    setError("La imagen es demasiado pesada.");
-    return;
-  }
   setBusy(true);
-  toast("Reduciendo foto…");
+  toast("Leyendo foto…");
   try {
-    pendingImage = await compressImageFile(file);
+    pendingImage = await readOriginalImageFile(file);
     previewImg.src = pendingImage;
     preview.hidden = false;
     setError("");
