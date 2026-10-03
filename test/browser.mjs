@@ -123,7 +123,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       save: JSON.parse(localStorage.getItem("food-log.save.v1")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.1.2");
+    assert.equal(shell.version, "food-log v0.1.3");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
