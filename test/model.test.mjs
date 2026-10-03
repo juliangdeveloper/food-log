@@ -12,6 +12,7 @@ import {
   createEmptyEnvelope,
   entriesForLocalDay,
   importEnvelope,
+  isImageDataUrl,
   parseFileId,
 } from "../js/model.js";
 import { persistEnvelope, readEnvelope } from "../js/storage.js";
@@ -81,6 +82,31 @@ test("image-only and text-only entries are valid; empty is not", () => {
   assert.equal(buildEntry({ description: "   ", kcal: "10" }).ok, false);
   assert.equal(buildEntry({ description: "sopa", kcal: "no sé" }).error, "bad_kcal");
   assert.equal(buildEntry({ description: "sopa", hunger: 9 }).entry.hunger, null);
+});
+
+test("original photos of any size are stored unchanged", () => {
+  const big = `data:image/jpeg;base64,${"A".repeat(4_000_050)}`;
+  assert.equal(isImageDataUrl(big), true);
+  const now = new Date("2026-10-02T12:00:00.000Z");
+  const photo = buildEntry({ image_data_url: big, description: "  " }, now);
+  assert.equal(photo.ok, true);
+  assert.equal(photo.entry.image_data_url, big);
+  assert.equal(photo.entry.description, "");
+  assert.equal(photo.entry.kcal, null);
+
+  const withKcal = buildEntry({
+    image_data_url: big,
+    description: "arroz",
+    kcal: "120",
+  }, now);
+  assert.equal(withKcal.ok, true);
+  assert.equal(withKcal.entry.image_data_url, big);
+
+  const envelope = createEmptyEnvelope(now);
+  envelope.data.entries = [photo.entry];
+  const imported = importEnvelope(envelope);
+  assert.equal(imported.ok, true);
+  assert.equal(imported.envelope.data.entries[0].image_data_url, big);
 });
 
 test("today list uses the local calendar day", () => {
