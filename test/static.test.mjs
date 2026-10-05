@@ -29,10 +29,14 @@ test("pages assets are relative and the picker client id is empty", () => {
   assert.match(files["js/config.js"], /1YQC6LvXllCqRzUpNJ3guYn1GXcHI3Ra6y6LtgPCZlD0/);
   assert.match(files["index.html"], /id="meals-file-id"/);
   assert.match(files["index.html"], /ID del archivo de comidas/);
-  assert.match(files["index.html"], /food-log v0\.1\.3/);
+  assert.match(files["index.html"], /food-log v0\.2\.0/);
+  assert.match(files["index.html"], /IndexedDB de este navegador/);
+  assert.match(files["index.html"], /7 días/);
+  assert.match(files["index.html"], /pantalla de inicio/);
   assert.match(files["index.html"], /Google Picker necesita un client id más adelante/);
   assert.match(files["js/drive.js"], /auth\/drive\.file/);
-  assert.match(files["js/config.js"], /APP_VERSION = "0\.1\.3"/);
+  assert.match(files["js/config.js"], /APP_VERSION = "0\.2\.0"/);
+  assert.match(files["js/config.js"], /SCHEMA_VERSION = 2/);
   assert.doesNotMatch(files["js/config.js"], /IMAGE_MAX_EDGE|IMAGE_JPEG_QUALITY/);
   assert.doesNotMatch(files["js/app.js"], /fetch\(/);
   assert.doesNotMatch(files["js/app.js"], /compressImageFile|shrinkDataUrlForDrive|demasiado pesada/);
@@ -45,5 +49,18 @@ test("pages assets are relative and the picker client id is empty", () => {
   assert.doesNotMatch(imageJs, /shrinkDataUrlForDrive|500 KB|Must not run unless|toBlob|canvas/);
   assert.doesNotMatch(imageJs, /1280|IMAGE_MAX_EDGE|IMAGE_JPEG_QUALITY/);
   assert.doesNotMatch(modelJs, /shrinkDataUrlForDrive|compressImageFile|4_000_000|4000000/);
-  assert.match(read("sw.js"), /food-log-v0\.1\.3/);
+  assert.match(read("sw.js"), /food-log-v0\.2\.0/);
+  assert.match(read("sw.js"), /js\/vendor\/idb-keyval\.js/);
+  const storageJs = read("js/storage.js");
+  assert.match(storageJs, /from "\.\/vendor\/idb-keyval\.js"/);
+  assert.match(storageJs, /createStore/);
+  assert.doesNotMatch(storageJs, /cdn\.|unpkg|jsdelivr|esm\.sh/);
+  assert.doesNotMatch(files["js/app.js"], /cdn\.|unpkg|jsdelivr|esm\.sh/);
+  const vendor = read("js/vendor/idb-keyval.js");
+  assert.match(vendor, /Apache License, Version 2\.0/);
+  assert.match(vendor, /export \{[^}]*\bcreateStore\b/);
+  assert.match(read("js/vendor/idb-keyval.LICENSE"), /Apache License, Version 2\.0/);
+  for (const name of ["js/app.js", "js/storage.js", "js/image.js", "js/model.js"]) {
+    assert.doesNotMatch(read(name), /toBlob|drawImage|createImageBitmap|createElement\(\s*["']canvas["']\)/, name);
+  }
 });

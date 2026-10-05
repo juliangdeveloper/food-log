@@ -1,4 +1,10 @@
-import { APP_ID, DEFAULT_MEALS_FILE_ID, DEFAULT_OVERRIDES_FILE_ID, SCHEMA_VERSION } from "./config.js";
+import {
+  APP_ID,
+  DEFAULT_MEALS_FILE_ID,
+  DEFAULT_OVERRIDES_FILE_ID,
+  SCHEMA_VERSION,
+  SUPPORTED_SCHEMA_VERSIONS,
+} from "./config.js";
 
 export const MEAL_TYPES = ["desayuno", "almuerzo", "cena", "snack", "otro"];
 
@@ -16,6 +22,14 @@ export function isImageDataUrl(value) {
   if (typeof value !== "string") return false;
   const trimmed = value.trim();
   return trimmed.length > 32 && IMAGE_RE.test(trimmed);
+}
+
+export function imageKeyFor(id) {
+  return `img:${id}`;
+}
+
+export function isImageKey(value) {
+  return typeof value === "string" && value.startsWith("img:") && value.length > 4;
 }
 
 function toIso(now) {
@@ -77,8 +91,13 @@ export function parseFileId(input) {
 export function buildEntry(input, now = new Date()) {
   const description = String(input?.description ?? "").trim();
   const image = String(input?.image_data_url ?? "").trim() || null;
+  const imageKey = isImageKey(input?.image_key) ? input.image_key : null;
   if (image && !isImageDataUrl(image)) return { ok: false, error: "bad_image" };
-  if (!image && !description) return { ok: false, error: "need_content" };
+  if (input?.image_key != null && input.image_key !== "" && !imageKey) {
+    return { ok: false, error: "bad_image" };
+  }
+  const hasImage = Boolean(image || imageKey || input?.has_image);
+  if (!hasImage && !description) return { ok: false, error: "need_content" };
   const kcalParsed = parseKcal(input?.kcal);
   if (!kcalParsed.ok) return { ok: false, error: "bad_kcal" };
   const iso = toIso(now);
@@ -94,8 +113,10 @@ export function buildEntry(input, now = new Date()) {
     hunger: parseHunger(input?.hunger),
     notes: String(input?.notes ?? "").trim(),
     kcal: kcalParsed.kcal,
-    image_data_url: image,
   };
+  if (imageKey) entry.image_key = imageKey;
+  if (image) entry.image_data_url = image;
+  else if (!imageKey) entry.image_data_url = null;
   return { ok: true, entry };
 }
 
@@ -118,8 +139,9 @@ export function entriesForLocalDay(entries, now = new Date()) {
 function normalizeEntry(raw) {
   if (!raw || typeof raw !== "object") return null;
   const description = typeof raw.description === "string" ? raw.description.trim() : "";
-  const image = isImageDataUrl(raw.image_data_url) ? raw.image_data_url : null;
-  if (!image && !description) return null;
+  const image = isImageDataUrl(raw.image_data_url) ? raw.image_data_url.trim() : null;
+  const imageKey = isImageKey(raw.image_key) ? raw.image_key : null;
+  if (!image && !imageKey && !description) return null;
   const kcalParsed = parseKcal(raw.kcal);
   const created = typeof raw.created_at === "string" && !Number.isNaN(Date.parse(raw.created_at))
     ? raw.created_at
@@ -127,7 +149,7 @@ function normalizeEntry(raw) {
   const updated = typeof raw.updated_at === "string" && !Number.isNaN(Date.parse(raw.updated_at))
     ? raw.updated_at
     : created;
-  return {
+  const entry = {
     id: typeof raw.id === "string" && raw.id
       ? raw.id
       : (globalThis.crypto?.randomUUID?.() || `entry-${created}`),
@@ -139,14 +161,17 @@ function normalizeEntry(raw) {
     hunger: parseHunger(raw.hunger),
     notes: typeof raw.notes === "string" ? raw.notes.trim() : "",
     kcal: kcalParsed.ok ? kcalParsed.kcal : null,
-    image_data_url: image,
   };
+  if (imageKey) entry.image_key = imageKey;
+  if (image) entry.image_data_url = image;
+  else if (!imageKey) entry.image_data_url = null;
+  return entry;
 }
 
 export function normalizeEnvelope(raw) {
   if (!raw || typeof raw !== "object") return null;
   if (raw.app_id !== APP_ID) return null;
-  if (raw.schema_version !== SCHEMA_VERSION) return null;
+  if (!SUPPORTED_SCHEMA_VERSIONS.includes(raw.schema_version)) return null;
   if (!raw.data || typeof raw.data !== "object" || Array.isArray(raw.data)) return null;
   if (!Array.isArray(raw.data.entries)) return null;
   const nutrition = raw.data.nutrition;
@@ -166,7 +191,7 @@ export function normalizeEnvelope(raw) {
     : new Date().toISOString();
   return {
     app_id: APP_ID,
-    schema_version: SCHEMA_VERSION,
+    schema_version: raw.schema_version,
     saved_at: savedAt,
     data: {
       entries: raw.data.entries.map(normalizeEntry).filter(Boolean),
@@ -203,7 +228,8 @@ export function importEnvelope(json) {
   if (raw && typeof raw === "object" && raw.app_id && raw.app_id !== APP_ID) {
     return { ok: false, error: "wrong_app" };
   }
-  if (raw && typeof raw === "object" && raw.schema_version != null && raw.schema_version !== SCHEMA_VERSION) {
+  if (raw && typeof raw === "object" && raw.schema_version != null
+    && !SUPPORTED_SCHEMA_VERSIONS.includes(raw.schema_version)) {
     return { ok: false, error: "wrong_version" };
   }
   return { ok: false, error: "invalid_envelope" };
