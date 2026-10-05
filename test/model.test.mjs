@@ -39,7 +39,7 @@ test("fresh envelope matches the shared shape and seeds the sheet id", () => {
   const envelope = createEmptyEnvelope(now);
   assert.equal(envelope.app_id, "food-log");
   assert.equal(APP_ID, "food-log");
-  assert.equal(envelope.schema_version, 1);
+  assert.equal(envelope.schema_version, 2);
   assert.equal(envelope.saved_at, "2026-10-02T15:04:05.000Z");
   assert.deepEqual(envelope.data.entries, []);
   assert.equal(envelope.data.nutrition.overrides_file_id, DEFAULT_OVERRIDES_FILE_ID);
@@ -107,6 +107,21 @@ test("original photos of any size are stored unchanged", () => {
   const imported = importEnvelope(envelope);
   assert.equal(imported.ok, true);
   assert.equal(imported.envelope.data.entries[0].image_data_url, big);
+
+  const pointer = buildEntry({ has_image: true, description: " " }, now);
+  assert.equal(pointer.ok, true);
+  assert.equal(pointer.entry.image_data_url, null);
+  assert.equal("image_key" in pointer.entry, false);
+  assert.equal("has_image" in pointer.entry, false);
+  assert.equal(buildEntry({ image_key: "not-a-key", description: "sopa" }).error, "bad_image");
+  const keyed = createEmptyEnvelope(now);
+  keyed.data.entries = [{ ...pointer.entry, image_key: "img:photo-1" }];
+  delete keyed.data.entries[0].image_data_url;
+  const keyedImport = importEnvelope(keyed);
+  assert.equal(keyedImport.ok, true);
+  assert.equal(keyedImport.envelope.data.entries[0].image_key, "img:photo-1");
+  assert.equal(keyedImport.envelope.data.entries[0].image_data_url, undefined);
+  assert.equal(keyedImport.envelope.data.entries[0].description, "");
 });
 
 test("today list uses the local calendar day", () => {
@@ -175,7 +190,7 @@ test("import rejects the wrong app and persists the envelope under the save key"
   assert.equal(importEnvelope(JSON.stringify({ app_id: "other", schema_version: 1 })).error, "wrong_app");
   assert.equal(importEnvelope(JSON.stringify({
     app_id: "food-log",
-    schema_version: 2,
+    schema_version: 3,
     data: { entries: [], nutrition: { overrides_file_id: null }, settings: {} },
   })).error, "wrong_version");
 
@@ -186,7 +201,7 @@ test("import rejects the wrong app and persists the envelope under the save key"
   assert.equal(saved.ok, true);
   const roundtrip = JSON.parse(storage.getItem(STORAGE_KEY));
   assert.equal(roundtrip.app_id, "food-log");
-  assert.equal(roundtrip.schema_version, 1);
+  assert.equal(roundtrip.schema_version, 2);
   assert.equal(roundtrip.data.nutrition.overrides_file_id, DEFAULT_OVERRIDES_FILE_ID);
   assert.equal(roundtrip.data.meals.file_id, DEFAULT_MEALS_FILE_ID);
   assert.equal(readEnvelope(storage).status, "ok");
