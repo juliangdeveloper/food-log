@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -111,6 +112,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
   try {
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "load" });
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
     await page.waitForSelector("#today-list");
 
     const shell = await page.evaluate(() => ({
@@ -123,13 +125,13 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       save: JSON.parse(localStorage.getItem("food-log.save.v1")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.1.3");
+    assert.equal(shell.version, "food-log v0.2.0");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
     assert.equal(shell.overflow, false);
     assert.equal(shell.save.app_id, "food-log");
-    assert.equal(shell.save.schema_version, 1);
+    assert.equal(shell.save.schema_version, 2);
     assert.deepEqual(shell.save.data.entries, []);
     assert.equal(shell.save.data.nutrition.overrides_file_id, SHEET);
     assert.equal(shell.save.data.meals.file_id, MEALS);
@@ -178,33 +180,74 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     const gallery = await page.$("#gallery-input");
     await gallery.uploadFile(photoPath);
     await page.waitForFunction(() => document.getElementById("save-entry").textContent === "Confirmar foto");
-    const originalDataUrl = `data:image/png;base64,${readFileSync(photoPath).toString("base64")}`;
     await page.click("#save-entry");
-    await page.waitForFunction(() => document.querySelectorAll("#today-list .entry").length === 1);
-    const photo = await page.evaluate(async (expected) => {
-      const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
-      const entry = save.data.entries[0];
-      const img = new Image();
-      img.src = entry.image_data_url;
-      await img.decode();
-      return {
-        description: entry.description,
-        kcal: entry.kcal,
-        same: entry.image_data_url === expected,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-        title: document.querySelector(".entry-title").textContent,
-      };
-    }, originalDataUrl);
+    await page.waitForFunction(() => {
+      const img = document.querySelector("#today-list .entry-photo");
+      return img && img.naturalWidth === 2000 && img.naturalHeight === 20;
+    });
+    const expectedPhoto = {
+      size: readFileSync(photoPath).length,
+      sha256: createHash("sha256").update(readFileSync(photoPath)).digest("hex"),
+    };
+    const photo = await readPhotoEntry(page);
     assert.equal(photo.description, "");
     assert.equal(photo.kcal, null);
-    assert.equal(photo.same, true);
+    assert.equal(photo.hasDataUrl, false);
+    assert.equal(photo.key, `img:${photo.id}`);
+    assert.equal(photo.blobSize, expectedPhoto.size);
+    assert.equal(photo.blobType, "image/png");
+    assert.equal(photo.sha256, expectedPhoto.sha256);
     assert.equal(photo.width, 2000);
     assert.equal(photo.height, 20);
     assert.equal(photo.title, "Foto");
+    assert.match(photo.src, /^blob:/);
+    assert.equal(photo.envelope.includes("base64"), false);
+
+    await page.reload({ waitUntil: "load" });
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    await page.waitForFunction(() => {
+      const img = document.querySelector("#today-list .entry-photo");
+      return img && img.naturalWidth === 2000 && img.naturalHeight === 20 && img.src.startsWith("blob:");
+    });
+    const reloaded = await readPhotoEntry(page);
+    assert.equal(reloaded.id, photo.id);
+    assert.equal(reloaded.key, photo.key);
+    assert.equal(reloaded.hasDataUrl, false);
+    assert.equal(reloaded.sha256, expectedPhoto.sha256);
+    assert.equal(reloaded.width, 2000);
+    assert.equal(reloaded.height, 20);
+
+    await page.click("#today-list .btn-danger");
+    await page.waitForSelector("#confirm-dialog[open]");
+    await page.click("#confirm-ok");
+    await page.waitForFunction(() => document.querySelectorAll("#today-list .entry").length === 0);
+    const photoLeft = await page.evaluate(async (key) => new Promise((resolve, reject) => {
+      const open = indexedDB.open("food-log");
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const req = db.transaction("photos", "readonly").objectStore("photos").get(key);
+        req.onerror = () => {
+          db.close();
+          reject(req.error);
+        };
+        req.onsuccess = () => {
+          const found = req.result != null;
+          db.close();
+          resolve(found);
+        };
+      };
+    }), reloaded.key);
+    assert.equal(photoLeft, false);
 
     await page.click("#open-settings");
     await page.waitForSelector("#settings-dialog[open]");
+    const storageNote = await page.$eval("#storage-status", (el) => el.textContent);
+    assert.match(storageNote, /IndexedDB de este navegador/);
+    assert.match(storageNote, /persistente/);
+    assert.match(storageNote, /Uso aproximado/);
+    assert.match(storageNote, /7 días/);
+    assert.match(storageNote, /pantalla de inicio/);
     assert.equal(await page.$eval("#overrides-file-id", (el) => el.value), SHEET);
     await page.click("#clear-overrides");
     await page.waitForFunction(() => {
@@ -298,9 +341,67 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     const exportedName = await waitForFile(downloadDir);
     const exported = JSON.parse(readFileSync(join(downloadDir, exportedName), "utf8"));
     assert.equal(exported.app_id, "food-log");
-    assert.equal(exported.schema_version, 1);
+    assert.equal(exported.schema_version, 2);
     assert.equal(exported.data.entries.length, 2);
     assert.equal(exported.data.meals.file_id, MEALS);
+
+    const gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    const gifBytes = Buffer.from(gif.split(",")[1], "base64");
+    const seededAt = new Date().toISOString();
+    const seeded = {
+      app_id: "food-log",
+      schema_version: 1,
+      saved_at: seededAt,
+      data: {
+        entries: [{
+          id: "mig-1",
+          created_at: seededAt,
+          updated_at: seededAt,
+          meal_type: "snack",
+          description: "Foto migrada",
+          portion: "",
+          hunger: null,
+          notes: "",
+          kcal: null,
+          image_data_url: gif,
+        }],
+        nutrition: { overrides_file_id: SHEET },
+        meals: { file_id: MEALS },
+        settings: { kept: true },
+      },
+    };
+    await page.evaluate((payload) => {
+      localStorage.setItem("food-log.save.v1", payload);
+    }, JSON.stringify(seeded));
+    await page.reload({ waitUntil: "load" });
+    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+    await page.waitForFunction(() => {
+      const save = JSON.parse(localStorage.getItem("food-log.save.v1") || "{}");
+      const entry = save.data?.entries?.[0];
+      const img = document.querySelector("#today-list .entry-photo");
+      return save.schema_version === 2
+        && entry?.image_key === "img:mig-1"
+        && !entry.image_data_url
+        && img
+        && img.naturalWidth === 1
+        && img.naturalHeight === 1;
+    });
+    const migrated = await readPhotoEntry(page);
+    assert.equal(migrated.schema, 2);
+    assert.equal(migrated.key, "img:mig-1");
+    assert.equal(migrated.hasDataUrl, false);
+    assert.equal(migrated.blobSize, gifBytes.length);
+    assert.equal(migrated.blobType, "image/gif");
+    assert.equal(migrated.sha256, createHash("sha256").update(gifBytes).digest("hex"));
+    assert.equal(migrated.width, 1);
+    assert.equal(migrated.height, 1);
+    assert.equal(migrated.title, "Foto migrada");
+    assert.match(migrated.src, /^blob:/);
+    const migratedSave = JSON.parse(await page.evaluate(() => localStorage.getItem("food-log.save.v1")));
+    assert.equal(migratedSave.data.nutrition.overrides_file_id, SHEET);
+    assert.equal(migratedSave.data.meals.file_id, MEALS);
+    assert.equal(migratedSave.data.settings.kept, true);
+    assert.equal(migratedSave.data.entries[0].description, "Foto migrada");
 
     await page.setViewport({ width: 1280, height: 800 });
     const desktopOverflow = await page.evaluate(() => (
@@ -316,6 +417,69 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
 
 function entryCount(page) {
   return page.$$eval("#today-list .entry", (nodes) => nodes.length);
+}
+
+async function readPhotoEntry(page) {
+  return page.evaluate(async () => {
+    const raw = localStorage.getItem("food-log.save.v1");
+    const save = JSON.parse(raw);
+    const entry = save.data.entries[0];
+    const stored = await new Promise((resolve, reject) => {
+      const open = indexedDB.open("food-log");
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction("photos", "readonly");
+        const req = tx.objectStore("photos").get(entry.image_key);
+        req.onerror = () => {
+          db.close();
+          reject(req.error);
+        };
+        req.onsuccess = () => {
+          const result = req.result;
+          if (!result) {
+            db.close();
+            resolve(null);
+            return;
+          }
+          const size = result.size;
+          const type = result.type;
+          result.arrayBuffer().then((bytes) => {
+            db.close();
+            resolve({ size, type, bytes });
+          }, (error) => {
+            db.close();
+            reject(error);
+          });
+        };
+      };
+    });
+    const img = document.querySelector("#today-list .entry-photo");
+    if (img?.decode) {
+      try { await img.decode(); } catch { /* the natural size is checked by the caller */ }
+    }
+    let sha256 = null;
+    if (stored?.bytes) {
+      const digest = await crypto.subtle.digest("SHA-256", stored.bytes);
+      sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+    return {
+      schema: save.schema_version,
+      id: entry.id,
+      key: entry.image_key || null,
+      hasDataUrl: Boolean(entry.image_data_url),
+      description: entry.description,
+      kcal: entry.kcal,
+      blobSize: stored?.size ?? null,
+      blobType: stored?.type ?? null,
+      sha256,
+      width: img?.naturalWidth ?? 0,
+      height: img?.naturalHeight ?? 0,
+      src: img?.src ?? "",
+      title: document.querySelector(".entry-title")?.textContent ?? "",
+      envelope: raw,
+    };
+  });
 }
 
 async function waitForFile(dir) {

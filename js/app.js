@@ -6,9 +6,17 @@ import {
   buildEntry,
   entriesForLocalDay,
   importEnvelope,
+  isImageDataUrl,
   parseFileId,
 } from "./model.js";
-import { persistEnvelope, readEnvelope } from "./storage.js";
+import {
+  migrateEnvelope,
+  openPhotoStore,
+  persistEnvelope,
+  placeOriginalPhoto,
+  readEnvelope,
+  requestPersistentStorage,
+} from "./storage.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,13 +45,19 @@ const settingsDialog = $("settings-dialog");
 const backupDialog = $("backup-dialog");
 const confirmDialog = $("confirm-dialog");
 const confirmText = $("confirm-text");
+const storageStatus = $("storage-status");
 
 let envelope = readEnvelope().envelope;
-let pendingImage = null;
+let photos = null;
+let ready = false;
+let pendingFile = null;
+let pendingPreviewUrl = null;
 let mealType = null;
 let hunger = null;
 let busy = false;
 let toastTimer = 0;
+let renderGeneration = 0;
+const entryUrls = new Set();
 
 function toast(message) {
   toastEl.textContent = message;
@@ -90,6 +104,23 @@ function formatKcal(value) {
   return `${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(value)} kcal`;
 }
 
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return null;
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const digits = unit === 0 || value >= 10 ? 0 : 1;
+  const formatted = new Intl.NumberFormat("es-CO", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+  return `${formatted} ${units[unit]}`;
+}
+
 function commit(next) {
   const saved = persistEnvelope(next);
   if (!saved.ok) {
@@ -113,19 +144,32 @@ function syncChips() {
 
 function updateSaveLabel() {
   const hasText = descriptionEl.value.trim().length > 0;
-  saveBtn.textContent = pendingImage && !hasText ? "Confirmar foto" : "Guardar";
+  saveBtn.textContent = pendingFile && !hasText ? "Confirmar foto" : "Guardar";
+}
+
+function revokeEntryUrls() {
+  for (const url of entryUrls) URL.revokeObjectURL(url);
+  entryUrls.clear();
+}
+
+function clearPendingPhoto() {
+  pendingFile = null;
+  if (pendingPreviewUrl) {
+    URL.revokeObjectURL(pendingPreviewUrl);
+    pendingPreviewUrl = null;
+  }
+  preview.hidden = true;
+  previewImg.removeAttribute("src");
 }
 
 function resetForm() {
-  pendingImage = null;
+  clearPendingPhoto();
   mealType = null;
   hunger = null;
   descriptionEl.value = "";
   portionEl.value = "";
   notesEl.value = "";
   kcalEl.value = "";
-  preview.hidden = true;
-  previewImg.removeAttribute("src");
   cameraInput.value = "";
   galleryInput.value = "";
   setError("");
@@ -133,12 +177,45 @@ function resetForm() {
   updateSaveLabel();
 }
 
-function renderToday() {
+async function resolveEntryImage(entry) {
+  if (entry.image_key && photos) {
+    try {
+      const blob = await photos.get(entry.image_key);
+      if (blob) return URL.createObjectURL(blob);
+    } catch {
+      // Fall through to a legacy data URL when the blob cannot be read.
+    }
+  }
+  if (isImageDataUrl(entry.image_data_url)) return entry.image_data_url;
+  return null;
+}
+
+async function renderToday() {
+  const generation = ++renderGeneration;
+  revokeEntryUrls();
   const entries = entriesForLocalDay(envelope.data.entries, new Date());
   todayCount.textContent = entries.length === 1 ? "1 comida" : `${entries.length} comidas`;
   todayEmpty.hidden = entries.length > 0;
   todayList.replaceChildren();
-  for (const entry of entries) todayList.append(renderEntry(entry));
+  const images = [];
+  for (const entry of entries) {
+    const view = renderEntry(entry);
+    todayList.append(view.li);
+    if (view.img) images.push({ entry, img: view.img });
+  }
+  await Promise.all(images.map(async ({ entry, img }) => {
+    const src = await resolveEntryImage(entry);
+    if (generation !== renderGeneration) {
+      if (src?.startsWith("blob:")) URL.revokeObjectURL(src);
+      return;
+    }
+    if (!src) {
+      img.remove();
+      return;
+    }
+    if (src.startsWith("blob:")) entryUrls.add(src);
+    img.src = src;
+  }));
 }
 
 function renderEntry(entry) {
@@ -161,10 +238,10 @@ function renderEntry(entry) {
   title.textContent = entry.description || "Foto";
   li.append(top, title);
 
-  if (entry.image_data_url) {
-    const img = document.createElement("img");
+  let img = null;
+  if (entry.image_key || isImageDataUrl(entry.image_data_url)) {
+    img = document.createElement("img");
     img.className = "entry-photo";
-    img.src = entry.image_data_url;
     img.alt = entry.description ? `Foto: ${entry.description}` : "Foto de la comida";
     li.append(img);
   }
@@ -193,7 +270,7 @@ function renderEntry(entry) {
   del.textContent = "Eliminar";
   del.addEventListener("click", () => onDelete(entry.id));
   li.append(del);
-  return li;
+  return { li, img };
 }
 
 function renderOverrides() {
@@ -206,6 +283,36 @@ function renderMeals() {
   const id = envelope.data.meals.file_id;
   mealsCurrent.textContent = id || "Ninguno";
   if (document.activeElement !== mealsInput) mealsInput.value = id || "";
+}
+
+async function renderStorageStatus() {
+  if (!storageStatus) return;
+  let persisted = false;
+  try {
+    if (navigator.storage?.persisted) persisted = await navigator.storage.persisted();
+  } catch {
+    persisted = false;
+  }
+  let usageText = "";
+  try {
+    if (navigator.storage?.estimate) {
+      const estimate = await navigator.storage.estimate();
+      const used = formatBytes(estimate?.usage);
+      const quota = formatBytes(estimate?.quota);
+      if (used && quota) usageText = ` Uso aproximado: ${used} de ${quota}.`;
+      else if (used) usageText = ` Uso aproximado: ${used}.`;
+    }
+  } catch {
+    usageText = "";
+  }
+  const where = photos
+    ? "Las fotos se guardan en IndexedDB de este navegador."
+    : "IndexedDB no está disponible; las fotos siguen en el almacenamiento local de este navegador.";
+  const persistText = persisted
+    ? "El almacenamiento de este sitio es persistente."
+    : "El almacenamiento de este sitio no está marcado como persistente.";
+  const safari = "En iPhone y Safari, los datos de un sitio que no se usa durante 7 días pueden borrarse, salvo que instales la app en la pantalla de inicio.";
+  storageStatus.textContent = `${where} ${persistText}${usageText} ${safari}`;
 }
 
 function confirmAction(message) {
@@ -221,32 +328,31 @@ function confirmAction(message) {
 
 async function onFile(file) {
   if (!file || busy) return;
-  setBusy(true);
-  toast("Leyendo foto…");
-  try {
-    pendingImage = await readOriginalImageFile(file);
-    previewImg.src = pendingImage;
-    preview.hidden = false;
-    setError("");
-    updateSaveLabel();
-    toast("Foto lista. Confírmala o completa los campos.");
-  } catch {
-    pendingImage = null;
-    preview.hidden = true;
-    previewImg.removeAttribute("src");
+  if (file.type && !file.type.startsWith("image/")) {
+    clearPendingPhoto();
     updateSaveLabel();
     setError("No se pudo leer la imagen. Prueba con JPG o PNG.");
-  } finally {
     cameraInput.value = "";
     galleryInput.value = "";
-    setBusy(false);
+    return;
   }
+  if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+  pendingFile = file;
+  pendingPreviewUrl = URL.createObjectURL(file);
+  previewImg.src = pendingPreviewUrl;
+  preview.hidden = false;
+  setError("");
+  updateSaveLabel();
+  cameraInput.value = "";
+  galleryInput.value = "";
+  toast("Foto lista. Confírmala o completa los campos.");
 }
 
 async function onSubmit(event) {
   event.preventDefault();
-  if (busy) return;
+  if (busy || !ready) return;
   setError("");
+  const file = pendingFile;
   const built = buildEntry({
     description: descriptionEl.value,
     portion: portionEl.value,
@@ -254,7 +360,7 @@ async function onSubmit(event) {
     kcal: kcalEl.value,
     meal_type: mealType,
     hunger,
-    image_data_url: pendingImage,
+    has_image: Boolean(file),
   });
   if (!built.ok) {
     const messages = {
@@ -266,12 +372,33 @@ async function onSubmit(event) {
     return;
   }
   setBusy(true);
+  let storedKey = null;
   try {
+    if (file) {
+      const placed = await placeOriginalPhoto(file, built.entry.id, { photos });
+      if (!placed.ok) {
+        setError("No se pudo usar esa foto. Prueba con otra.");
+        return;
+      }
+      if (placed.image_key) {
+        storedKey = placed.image_key;
+        built.entry.image_key = placed.image_key;
+        delete built.entry.image_data_url;
+      } else {
+        built.entry.image_data_url = placed.image_data_url;
+        delete built.entry.image_key;
+      }
+    }
     const next = structuredClone(envelope);
     next.data.entries.unshift(built.entry);
-    if (!commit(next)) return;
+    if (!commit(next)) {
+      if (storedKey && photos) {
+        try { await photos.del(storedKey); } catch { /* ignore */ }
+      }
+      return;
+    }
     resetForm();
-    renderToday();
+    await renderToday();
     toast("Comida guardada.");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     $("today").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
@@ -280,13 +407,20 @@ async function onSubmit(event) {
   }
 }
 
+async function deletePhoto(key) {
+  if (!key || !photos) return;
+  try { await photos.del(key); } catch { /* the entry is already gone */ }
+}
+
 async function onDelete(id) {
   const ok = await confirmAction("¿Eliminar esta comida? No se puede deshacer.");
   if (!ok) return;
+  const existing = envelope.data.entries.find((entry) => entry.id === id);
   const next = structuredClone(envelope);
   next.data.entries = next.data.entries.filter((entry) => entry.id !== id);
   if (!commit(next)) return;
-  renderToday();
+  await deletePhoto(existing?.image_key);
+  await renderToday();
   toast("Comida eliminada.");
 }
 
@@ -328,10 +462,26 @@ function onClearMeals() {
   toast("ID quitado.");
 }
 
-function onExport() {
+async function onExport() {
   const next = structuredClone(envelope);
   if (!commit(next)) return;
-  const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" });
+  const exported = structuredClone(envelope);
+  if (photos) {
+    for (const entry of exported.data.entries) {
+      if (!entry.image_key || isImageDataUrl(entry.image_data_url)) continue;
+      try {
+        const blob = await photos.get(entry.image_key);
+        if (!blob) continue;
+        const dataUrl = await readOriginalImageFile(blob);
+        if (!isImageDataUrl(dataUrl)) continue;
+        entry.image_data_url = dataUrl;
+        delete entry.image_key;
+      } catch {
+        // Keep the key when the blob cannot be read back into the file.
+      }
+    }
+  }
+  const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -356,16 +506,23 @@ async function onImport(file) {
   if (!result.ok) {
     const messages = {
       wrong_app: "El archivo no es de food-log.",
-      wrong_version: "Esta versión solo abre bitácoras schema_version 1.",
+      wrong_version: "Esta versión solo abre bitácoras schema_version 1 o 2.",
       invalid_json: "El archivo no es JSON válido.",
       invalid_envelope: "El archivo no tiene la forma de una bitácora.",
     };
     toast(messages[result.error] || "No se pudo importar.");
     return;
   }
+  const previousKeys = envelope.data.entries.map((entry) => entry.image_key).filter(Boolean);
   if (!commit(result.envelope)) return;
+  const migrated = await migrateEnvelope(envelope, { storage: localStorage, photos });
+  envelope = migrated.envelope;
+  const kept = new Set(envelope.data.entries.map((entry) => entry.image_key).filter(Boolean));
+  for (const key of previousKeys) {
+    if (!kept.has(key)) await deletePhoto(key);
+  }
   resetForm();
-  renderToday();
+  await renderToday();
   renderOverrides();
   renderMeals();
   const count = envelope.data.entries.length;
@@ -406,16 +563,38 @@ function setupDrive() {
   button.addEventListener("click", onDrivePick);
 }
 
-function boot() {
+async function boot() {
   const stored = readEnvelope();
   envelope = stored.envelope;
+  try {
+    photos = await openPhotoStore();
+  } catch {
+    photos = null;
+  }
+  await requestPersistentStorage();
+  if (photos && (stored.status === "ok" || stored.status === "empty")) {
+    try {
+      const migrated = await migrateEnvelope(envelope, { storage: localStorage, photos });
+      envelope = migrated.envelope;
+      if (migrated.moved > 0) toast("Fotos movidas al almacenamiento de este navegador.");
+    } catch {
+      // Keep the envelope as it was read. Data URLs stay until a later load can move them.
+    }
+  } else if (stored.status === "ok" || stored.status === "empty") {
+    try {
+      const migrated = await migrateEnvelope(envelope, { storage: localStorage, photos: null });
+      envelope = migrated.envelope;
+    } catch {
+      // Schema stays as stored when the upgrade cannot be written.
+    }
+  }
   if (stored.status === "empty") commit(envelope);
   if (stored.status === "invalid") {
     toast("No se pudo leer la bitácora guardada. Si guardas de nuevo, se reemplaza.");
   }
   $("version").textContent = `food-log v${APP_VERSION}`;
   todayDate.textContent = formatLongDate(new Date());
-  renderToday();
+  await renderToday();
   renderOverrides();
   renderMeals();
   updateSaveLabel();
@@ -426,9 +605,7 @@ function boot() {
   cameraInput.addEventListener("change", () => onFile(cameraInput.files?.[0]));
   galleryInput.addEventListener("change", () => onFile(galleryInput.files?.[0]));
   $("remove-photo").addEventListener("click", () => {
-    pendingImage = null;
-    preview.hidden = true;
-    previewImg.removeAttribute("src");
+    clearPendingPhoto();
     updateSaveLabel();
   });
   document.querySelectorAll("[data-meal]").forEach((button) => {
@@ -444,10 +621,15 @@ function boot() {
       syncChips();
     });
   });
-  $("open-settings").addEventListener("click", () => {
+  $("open-settings").addEventListener("click", async () => {
     renderOverrides();
     renderMeals();
-    settingsDialog.showModal();
+    try {
+      await renderStorageStatus();
+    } catch {
+      // The static note stays if the storage API fails.
+    }
+    if (!settingsDialog.open) settingsDialog.showModal();
   });
   $("open-backup").addEventListener("click", () => backupDialog.showModal());
   $("save-overrides").addEventListener("click", onSaveOverrides);
@@ -473,6 +655,8 @@ function boot() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
+  ready = true;
+  document.documentElement.dataset.ready = "1";
 }
 
 boot();
