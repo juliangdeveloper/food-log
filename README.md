@@ -12,4 +12,6 @@ El JSON de respaldo lleva las fotos (data URL de esos mismos bytes) para poder m
 
 En Ajustes se indica si el almacenamiento del sitio es persistente y, cuando el navegador lo permite, el uso aproximado. En iPhone y Safari, los datos de un sitio que no se usa durante 7 días pueden borrarse, salvo que la app esté en la pantalla de inicio.
 
+Los IDs de las hojas (tabla de nutrición y registro de comidas) no vienen en el código. Una instalación nueva muestra «Ninguno»; pega el ID o el enlace de cada hoja en Ajustes.
+
 Los ID de las hojas (`overrides_file_id` y `meals.file_id`) siguen siendo solo punteros. food-log no lee Drive ni sube fotos.

@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SHEET = "TU_OVERRIDES_FILE_ID";
-const MEALS = "TU_MEALS_FILE_ID";
+const SHEET = "1TestOverridesFileId_0000000000000000000000";
+const MEALS = "1TestMealsFileId_00000000000000000000000000";
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -133,8 +133,8 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.equal(shell.save.app_id, "food-log");
     assert.equal(shell.save.schema_version, 2);
     assert.deepEqual(shell.save.data.entries, []);
-    assert.equal(shell.save.data.nutrition.overrides_file_id, SHEET);
-    assert.equal(shell.save.data.meals.file_id, MEALS);
+    assert.equal(shell.save.data.nutrition.overrides_file_id, null);
+    assert.equal(shell.save.data.meals.file_id, null);
     assert.deepEqual(shell.save.data.settings, {});
 
     await page.click("#save-entry");
@@ -248,7 +248,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.match(storageNote, /Uso aproximado/);
     assert.match(storageNote, /7 días/);
     assert.match(storageNote, /pantalla de inicio/);
-    assert.equal(await page.$eval("#overrides-file-id", (el) => el.value), SHEET);
+    assert.equal(await page.$eval("#overrides-file-id", (el) => el.value), "");
     await page.click("#clear-overrides");
     await page.waitForFunction(() => {
       const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
@@ -263,7 +263,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
       return save.data.nutrition.overrides_file_id === id;
     }, {}, SHEET);
-    assert.equal(await page.$eval("#meals-file-id", (el) => el.value), MEALS);
+    assert.equal(await page.$eval("#meals-file-id", (el) => el.value), "");
     await page.click("#clear-meals");
     await page.waitForFunction(() => {
       const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
@@ -331,7 +331,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     });
     assert.deepEqual(afterImport.visible, ["Mandarina"]);
     assert.deepEqual(afterImport.stored.slice().sort(), ["Mandarina", "Sopa de ayer"]);
-    assert.equal(afterImport.meals, MEALS);
+    assert.equal(afterImport.meals, null);
 
     const client = await page.createCDPSession();
     await client.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: downloadDir });
@@ -343,7 +343,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.equal(exported.app_id, "food-log");
     assert.equal(exported.schema_version, 2);
     assert.equal(exported.data.entries.length, 2);
-    assert.equal(exported.data.meals.file_id, MEALS);
+    assert.equal(exported.data.meals.file_id, null);
 
     const gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
     const gifBytes = Buffer.from(gif.split(",")[1], "base64");

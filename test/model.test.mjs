@@ -43,9 +43,9 @@ test("fresh envelope matches the shared shape and seeds the sheet id", () => {
   assert.equal(envelope.saved_at, "2026-10-02T15:04:05.000Z");
   assert.deepEqual(envelope.data.entries, []);
   assert.equal(envelope.data.nutrition.overrides_file_id, DEFAULT_OVERRIDES_FILE_ID);
-  assert.equal(envelope.data.nutrition.overrides_file_id, "TU_OVERRIDES_FILE_ID");
+  assert.equal(envelope.data.nutrition.overrides_file_id, null);
   assert.equal(envelope.data.meals.file_id, DEFAULT_MEALS_FILE_ID);
-  assert.equal(envelope.data.meals.file_id, "TU_MEALS_FILE_ID");
+  assert.equal(envelope.data.meals.file_id, null);
   assert.deepEqual(envelope.data.settings, {});
   assert.equal(GOOGLE_CLIENT_ID, "");
   assert.equal(STORAGE_KEY, "food-log.save.v1");
