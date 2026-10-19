@@ -22,6 +22,7 @@ test("pages assets are relative and the picker client id is empty", () => {
     assert.doesNotMatch(source, /url\(\s*["']?\//, `${name} has a root-absolute css url`);
   }
   assert.match(files["index.html"], /href="css\/styles.css"/);
+  assert.match(files["css/styles.css"], /\.preview\[hidden\]\s*\{\s*display:\s*none;?\s*\}/);
   assert.match(files["index.html"], /src="js\/app.js"/);
   assert.match(files["index.html"], /lang="es-CO"/);
   assert.equal(files["js/config.js"].includes('export const GOOGLE_CLIENT_ID = "";'), true);
