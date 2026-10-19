@@ -24,3 +24,5 @@ python3 -m http.server 8000   # abrir http://localhost:8000
 ---
 
 Más proyectos: https://juliangdeveloper.github.io/
+
+Hecho con ❤️ y 🍽️
