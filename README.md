@@ -1,17 +1,26 @@
-# food-log
+# 🍽️ food-log
 
-Bitácora de comidas estática (vanilla JS, interfaz en es-CO) para GitHub Pages. No hay servidor ni bundler: `index.html` carga `js/app.js` como módulo y los recursos usan rutas relativas.
+> Registra lo que comes en segundos, con foto opcional. Funciona sin conexión y tus datos se quedan en tu navegador.
 
-## Almacenamiento (v0.2.0)
+**[▶ Probar ahora](https://juliangdeveloper.github.io/food-log/)** · gratis, en el navegador, sin instalar ni crear cuenta
 
-La bitácora sigue en `localStorage`, clave `food-log.save.v1`. Las bitácoras nuevas usan `schema_version` 2. Las fotos no van en ese JSON: se guardan como `Blob` original (los bytes del archivo, sin recomprimir ni redimensionar) en IndexedDB, base `food-log`, almacén `photos`, con [`idb-keyval`](js/vendor/idb-keyval.js) 6.3.0. La clave es `img:<id de la entrada>`.
+<img src="docs/screenshot.png" alt="Pantalla de food-log con el formulario de registro y una comida guardada" width="300">
 
-Al abrir la app, una bitácora `schema_version` 1 migra cada `image_data_url`. El data URL solo se quita después de escribir el blob, leerlo y comprobar que el tamaño y el tipo coinciden. Si el proceso se interrumpe, el siguiente arranque continúa. Si IndexedDB no está disponible, las fotos siguen como data URL en `localStorage`.
+## Cómo se usa
+- Toma una foto o elige una de la galería (opcional).
+- Marca la comida (desayuno, almuerzo, cena, snack u otro) y escribe qué comiste y la porción.
+- Si quieres, agrega hambre (1 a 5), notas y calorías; la app no las calcula por ti.
+- Pulsa **Guardar**: la comida aparece en la lista de hoy.
+- En **Respaldo** exportas o importas un JSON con todo el historial, fotos incluidas, para pasarlo a otro navegador.
+- Instálala en la pantalla de inicio para usarla como app y evitar que el navegador borre los datos.
 
-El JSON de respaldo lleva las fotos (data URL de esos mismos bytes) para poder moverlas a otro navegador. Al importarlo, vuelven a IndexedDB. Borrar una comida también borra su foto.
+## Stack
+JavaScript vanilla (módulos ES), `localStorage` para los registros e IndexedDB para las fotos, con service worker para uso offline. Sin servidor ni bundler.
 
-En Ajustes se indica si el almacenamiento del sitio es persistente y, cuando el navegador lo permite, el uso aproximado. En iPhone y Safari, los datos de un sitio que no se usa durante 7 días pueden borrarse, salvo que la app esté en la pantalla de inicio.
+```
+python3 -m http.server 8000   # abrir http://localhost:8000
+```
 
-Los IDs de las hojas (tabla de nutrición y registro de comidas) no vienen en el código. Una instalación nueva muestra «Ninguno»; pega el ID o el enlace de cada hoja en Ajustes.
+---
 
-Los ID de las hojas (`overrides_file_id` y `meals.file_id`) siguen siendo solo punteros. food-log no lee Drive ni sube fotos.
+Más proyectos: https://juliangdeveloper.github.io/
