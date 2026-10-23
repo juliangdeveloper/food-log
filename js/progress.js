@@ -3,28 +3,26 @@ import { backfillMeta, scheduleMetaUpdate } from "./meta.js";
 
 const DAY_MS = 86400000;
 
-// Declared stat keys, in stored order. Monotonic counts and bests never decrease.
 export const STATS = [
-  { key: "days_logged", monotonic: true }, // days with a meal
-  { key: "entries_total", monotonic: true }, // meals saved
-  { key: "photo_entries", monotonic: true }, // meals with a photo
-  { key: "current_streak_days", monotonic: false }, // active streak
-  { key: "best_streak_days", monotonic: true }, // longest streak
+  { key: "days_logged", monotonic: true },
+  { key: "entries_total", monotonic: true },
+  { key: "photo_entries", monotonic: true },
+  { key: "current_streak_days", monotonic: false },
+  { key: "best_streak_days", monotonic: true },
 ];
 
-// Stable ids. A logro stays once the count has been reached.
 export const ACHIEVEMENTS = [
-  { id: "first_entry", met: (stats) => stats.entries_total >= 1 }, // 1 meal saved
-  { id: "entries_10", met: (stats) => stats.entries_total >= 10 }, // 10 meals saved
-  { id: "entries_50", met: (stats) => stats.entries_total >= 50 }, // 50 meals saved
-  { id: "entries_100", met: (stats) => stats.entries_total >= 100 }, // 100 meals saved
-  { id: "first_photo", met: (stats) => stats.photo_entries >= 1 }, // 1 photo
-  { id: "photos_10", met: (stats) => stats.photo_entries >= 10 }, // 10 photos
-  { id: "days_7", met: (stats) => stats.days_logged >= 7 }, // 7 different days
-  { id: "days_30", met: (stats) => stats.days_logged >= 30 }, // 30 different days
-  { id: "streak_3", met: (stats) => stats.best_streak_days >= 3 }, // best streak of 3 days
-  { id: "streak_7", met: (stats) => stats.best_streak_days >= 7 }, // best streak of 7 days
-  { id: "streak_30", met: (stats) => stats.best_streak_days >= 30 }, // best streak of 30 days
+  { id: "first_entry", met: (stats) => stats.entries_total >= 1 },
+  { id: "entries_10", met: (stats) => stats.entries_total >= 10 },
+  { id: "entries_50", met: (stats) => stats.entries_total >= 50 },
+  { id: "entries_100", met: (stats) => stats.entries_total >= 100 },
+  { id: "first_photo", met: (stats) => stats.photo_entries >= 1 },
+  { id: "photos_10", met: (stats) => stats.photo_entries >= 10 },
+  { id: "days_7", met: (stats) => stats.days_logged >= 7 },
+  { id: "days_30", met: (stats) => stats.days_logged >= 30 },
+  { id: "streak_3", met: (stats) => stats.best_streak_days >= 3 },
+  { id: "streak_7", met: (stats) => stats.best_streak_days >= 7 },
+  { id: "streak_30", met: (stats) => stats.best_streak_days >= 30 },
 ];
 
 function localDayIndex(value) {
@@ -112,7 +110,6 @@ export function syncProgress(envelope, deps = {}) {
   try {
     scheduleMetaUpdate(APP_ID, APP_VERSION, snapshot(envelope, deps.now), metaDeps(deps));
   } catch {
-    /* ignore */
   }
 }
 
@@ -120,7 +117,6 @@ export function flushProgress() {
   try {
     scheduleMetaUpdate.flush();
   } catch {
-    /* ignore */
   }
 }
 
@@ -131,6 +127,5 @@ export function bindProgressFlush(win, doc) {
       if (doc.visibilityState === "hidden") flushProgress();
     });
   } catch {
-    /* ignore */
   }
 }

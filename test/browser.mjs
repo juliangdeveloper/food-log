@@ -126,7 +126,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       meta: JSON.parse(localStorage.getItem("meta.v1.food-log")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.2.5");
+    assert.equal(shell.version, "food-log v0.2.6");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
@@ -139,7 +139,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.deepEqual(shell.save.data.settings, {});
     assert.equal(shell.meta.v, 1);
     assert.equal(shell.meta.slug, "food-log");
-    assert.equal(shell.meta.version, "0.2.5");
+    assert.equal(shell.meta.version, "0.2.6");
     assert.deepEqual(shell.meta.stats, {
       days_logged: 0,
       entries_total: 0,
@@ -484,7 +484,7 @@ async function readPhotoEntry(page) {
     });
     const img = document.querySelector("#today-list .entry-photo");
     if (img?.decode) {
-      try { await img.decode(); } catch { /* the natural size is checked by the caller */ }
+      try { await img.decode(); } catch { }
     }
     let sha256 = null;
     if (stored?.bytes) {

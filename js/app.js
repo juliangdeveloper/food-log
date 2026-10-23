@@ -184,7 +184,6 @@ async function resolveEntryImage(entry) {
       const blob = await photos.get(entry.image_key);
       if (blob) return URL.createObjectURL(blob);
     } catch {
-      // Fall through to a legacy data URL when the blob cannot be read.
     }
   }
   if (isImageDataUrl(entry.image_data_url)) return entry.image_data_url;
@@ -394,7 +393,7 @@ async function onSubmit(event) {
     next.data.entries.unshift(built.entry);
     if (!commit(next)) {
       if (storedKey && photos) {
-        try { await photos.del(storedKey); } catch { /* ignore */ }
+        try { await photos.del(storedKey); } catch { }
       }
       return;
     }
@@ -411,7 +410,7 @@ async function onSubmit(event) {
 
 async function deletePhoto(key) {
   if (!key || !photos) return;
-  try { await photos.del(key); } catch { /* the entry is already gone */ }
+  try { await photos.del(key); } catch { }
 }
 
 async function onDelete(id) {
@@ -480,7 +479,6 @@ async function onExport() {
         entry.image_data_url = dataUrl;
         delete entry.image_key;
       } catch {
-        // Keep the key when the blob cannot be read back into the file.
       }
     }
   }
@@ -582,14 +580,12 @@ async function boot() {
       envelope = migrated.envelope;
       if (migrated.moved > 0) toast("Fotos movidas al almacenamiento de este navegador.");
     } catch {
-      // Keep the envelope as it was read. Data URLs stay until a later load can move them.
     }
   } else if (stored.status === "ok" || stored.status === "empty") {
     try {
       const migrated = await migrateEnvelope(envelope, { storage: localStorage, photos: null });
       envelope = migrated.envelope;
     } catch {
-      // Schema stays as stored when the upgrade cannot be written.
     }
   }
   if (stored.status === "empty") commit(envelope);
@@ -632,7 +628,6 @@ async function boot() {
     try {
       await renderStorageStatus();
     } catch {
-      // The static note stays if the storage API fails.
     }
     if (!settingsDialog.open) settingsDialog.showModal();
   });

@@ -4,9 +4,6 @@ const MAX_STATS = 20;
 const ID_RE = /^[a-z][a-z0-9_]*$/;
 const globalClock = { lastWriteAt: null };
 
-// Project status, set by hand and bumped with the version. Never computed from play.
-// fase 1-6: Idea, Definición, Diseño, Construcción, Validación, Lanzamiento y mantenimiento.
-// fase_estado 0-4: pendiente, en curso, bloqueada, en revisión, completada.
 export const PROYECTO = {
   objetivo: 'Registrar cada comida en segundos, con foto opcional, sin conexión y con respaldo completo del historial.',
   fase: 5,
@@ -20,7 +17,6 @@ function proyectoInt(n, lo, hi) {
   return typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
 }
 
-// Clean copy of a proyecto block, or null when any field is missing or out of range.
 export function metaProyecto(p) {
   try {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
@@ -33,12 +29,10 @@ export function metaProyecto(p) {
   }
 }
 
-// Tests only: swap the block the writer uses (null restores PROYECTO).
 export function metaSetProyecto(p) {
   proyectoSource = p === null ? PROYECTO : p;
 }
 
-// Adds the current proyecto block to a record being written, when it is valid.
 function withProyecto(record) {
   const p = metaProyecto(proyectoSource);
   if (p) record.proyecto = p;
@@ -155,7 +149,6 @@ function postMeta(key, record, deps) {
     if (!view || view.parent === view) return;
     view.parent.postMessage({ type: "meta", key, data: record }, view.location.origin);
   } catch {
-    /* ignore */
   }
 }
 
@@ -208,12 +201,10 @@ export function backfillMeta(slug, version, payload = {}, deps = {}) {
       const valid = parseValid(raw, slug);
       if (valid) return valid;
     } catch {
-      /* rebuild below */
     }
     try {
       storage.setItem(`${key}.corrupt`, raw);
     } catch {
-      /* ignore */
     }
     return metaUpdate(slug, version, payload, deps);
   } catch {
@@ -258,7 +249,6 @@ export function createMetaScheduler() {
       }
       later(() => writeQueued(false), wait);
     } catch {
-      /* ignore */
     }
   }
 
@@ -272,7 +262,6 @@ export function createMetaScheduler() {
       }
       writeQueued(true);
     } catch {
-      /* ignore */
     }
   };
 
