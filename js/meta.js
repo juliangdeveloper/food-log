@@ -5,10 +5,10 @@ const ID_RE = /^[a-z][a-z0-9_]*$/;
 const globalClock = { lastWriteAt: null };
 
 export const PROYECTO = {
-  objetivo: 'Registrar cada comida en segundos, con foto opcional, sin conexión y con respaldo completo del historial.',
-  fase: 5,
-  fase_estado: 1,
-  fases_completadas: 4
+  objetivo: 'En algún momento pensé que era una buena idea, pero tal vez te sirva de inspiración.',
+  fase: 7,
+  fase_estado: 4,
+  fases_completadas: 2
 };
 
 let proyectoSource = PROYECTO;
@@ -22,7 +22,7 @@ export function metaProyecto(p) {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
     const o = p.objetivo;
     if (typeof o !== 'string' || !o.trim() || Array.from(o).length > 140) return null;
-    if (!proyectoInt(p.fase, 1, 6) || !proyectoInt(p.fase_estado, 0, 4) || !proyectoInt(p.fases_completadas, 0, 6)) return null;
+    if (!proyectoInt(p.fase, 1, 7) || !proyectoInt(p.fase_estado, 0, 4) || !proyectoInt(p.fases_completadas, 0, 6)) return null;
     return { objetivo: o, fase: p.fase, fase_estado: p.fase_estado, fases_completadas: p.fases_completadas };
   } catch (e) {
     return null;
