@@ -176,9 +176,8 @@ export async function placeOriginalPhoto(file, id, options = {}) {
       const stored = await photos.get(key);
       if (blobMatches(stored, file)) return { ok: true, image_key: key };
     } catch {
-      // IndexedDB rejected the write. Fall back to a data URL.
     }
-    try { await photos.del(key); } catch { /* ignore */ }
+    try { await photos.del(key); } catch { }
   }
   try {
     const imageDataUrl = await readFile(file);

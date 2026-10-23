@@ -1,4 +1,3 @@
-// meta.v1 proyecto block: written when valid, left out when invalid, optional on read.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STATS } from "../js/progress.js";
@@ -93,7 +92,6 @@ test("a stored record with a different proyecto gets the current block on the ne
   assert.equal(rec.hitos.first_entry, "2026-01-01T00:00:00.000Z");
   assert.equal(storage.getItem(`${KEY}.corrupt`), null);
 
-  // With an invalid current block the stale one is dropped, not kept.
   metaSetProyecto({ fase: 9 });
   const second = memoryStorage({ [KEY]: JSON.stringify(old) });
   metaUpdate(SLUG, "v9.9.9", { stats: {}, logros: [] }, deps(second));
