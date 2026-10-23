@@ -126,7 +126,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       meta: JSON.parse(localStorage.getItem("meta.v1.food-log")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.2.3");
+    assert.equal(shell.version, "food-log v0.2.4");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
@@ -139,7 +139,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.deepEqual(shell.save.data.settings, {});
     assert.equal(shell.meta.v, 1);
     assert.equal(shell.meta.slug, "food-log");
-    assert.equal(shell.meta.version, "0.2.3");
+    assert.equal(shell.meta.version, "0.2.4");
     assert.deepEqual(shell.meta.stats, {
       days_logged: 0,
       entries_total: 0,

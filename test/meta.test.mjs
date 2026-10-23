@@ -7,6 +7,7 @@ import {
   STATS,
   achievementIdsFor,
   backfillProgress,
+  bindProgressFlush,
   flushProgress,
   progressStats,
   syncProgress,
@@ -290,7 +291,22 @@ test("metaUpdate keeps hitos, drops non-finite and undeclared stats, and strips 
   assert.equal(messages.length, 2);
 });
 
-test("backfill, a later save, and flush write the meta key at most once per second", () => {
+function eventTarget() {
+  const listeners = new Map();
+  return {
+    visibilityState: "visible",
+    addEventListener(type, fn) {
+      const list = listeners.get(type) || [];
+      list.push(fn);
+      listeners.set(type, list);
+    },
+    dispatch(type) {
+      for (const fn of listeners.get(type) || []) fn();
+    },
+  };
+}
+
+test("normal saves stay at one meta write per second after backfill", () => {
   mock.timers.enable({ apis: ["setTimeout", "Date"] });
   try {
     const storage = memoryStorage();
@@ -304,12 +320,10 @@ test("backfill, a later save, and flush write the meta key at most once per seco
     backfillProgress({ data: { entries: [] } }, { storage, clock, window: view, now: new Date("2026-10-23T18:00:00.000Z") });
     syncProgress({ data: { entries: [meal("a")] } }, { storage, clock, window: view });
     syncProgress({ data: { entries: [meal("a"), meal("b")] } }, { storage, clock, window: view });
-    flushProgress();
     assert.deepEqual(storage.writes, [KEY]);
     assert.equal(posts.length, 1);
     assert.equal(JSON.parse(storage.getItem(KEY)).stats.entries_total, 0);
     mock.timers.tick(999);
-    flushProgress();
     assert.deepEqual(storage.writes, [KEY]);
     assert.equal(posts.length, 1);
     mock.timers.tick(1);
@@ -320,6 +334,68 @@ test("backfill, a later save, and flush write the meta key at most once per seco
     flushProgress();
     assert.deepEqual(storage.writes, [KEY, KEY]);
     assert.equal(posts.length, 2);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test("pagehide and hiding the page flush a pending change inside one second", () => {
+  mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  try {
+    const storage = memoryStorage();
+    const clock = freshClock();
+    const posts = [];
+    const view = {
+      location: { origin: "https://portfolio.test" },
+      parent: { postMessage(message) { posts.push(message); } },
+    };
+    const win = eventTarget();
+    const doc = eventTarget();
+    bindProgressFlush(win, doc);
+    const meal = (id) => entry("2026-10-23T12:00:00.000Z", { id });
+    const deps = { storage, clock, window: view, now: new Date("2026-10-23T18:00:00.000Z") };
+
+    backfillProgress({ data: { entries: [] } }, deps);
+    win.dispatch("pagehide");
+    doc.visibilityState = "hidden";
+    doc.dispatch("visibilitychange");
+    assert.deepEqual(storage.writes, [KEY]);
+    assert.equal(posts.length, 1);
+
+    syncProgress({ data: { entries: [meal("a"), meal("b")] } }, deps);
+    doc.visibilityState = "visible";
+    doc.dispatch("visibilitychange");
+    assert.deepEqual(storage.writes, [KEY]);
+    assert.equal(posts.length, 1);
+
+    win.dispatch("pagehide");
+    assert.deepEqual(storage.writes, [KEY, KEY]);
+    assert.equal(posts.length, 2);
+    assert.equal(JSON.parse(storage.getItem(KEY)).stats.entries_total, 2);
+    assert.equal(posts[1].type, "meta");
+    assert.equal(posts[1].key, KEY);
+    mock.timers.tick(400);
+    assert.deepEqual(storage.writes, [KEY, KEY]);
+
+    win.dispatch("pagehide");
+    doc.visibilityState = "hidden";
+    doc.dispatch("visibilitychange");
+    assert.deepEqual(storage.writes, [KEY, KEY]);
+    assert.equal(posts.length, 2);
+
+    syncProgress({ data: { entries: [meal("a"), meal("b"), meal("c")] } }, deps);
+    assert.equal(storage.writes.length, 2);
+    doc.visibilityState = "hidden";
+    doc.dispatch("visibilitychange");
+    assert.deepEqual(storage.writes, [KEY, KEY, KEY]);
+    assert.equal(posts.length, 3);
+    assert.equal(JSON.parse(storage.getItem(KEY)).stats.entries_total, 3);
+
+    doc.dispatch("visibilitychange");
+    win.dispatch("pagehide");
+    mock.timers.tick(1000);
+    assert.deepEqual(storage.writes, [KEY, KEY, KEY]);
+    assert.equal(posts.length, 3);
   } finally {
     mock.timers.reset();
   }
@@ -466,8 +542,14 @@ test("demo and preview modes do not write or post", () => {
       parent: { postMessage() { posts += 1; } },
     };
     const clock = freshClock();
+    const win = eventTarget();
+    const doc = eventTarget();
+    bindProgressFlush(win, doc);
     const record = backfillProgress(JSON.parse(rawSave), { storage, search, clock, now, window: view });
     syncProgress(JSON.parse(rawSave), { storage, search, clock, now, window: view });
+    win.dispatch("pagehide");
+    doc.visibilityState = "hidden";
+    doc.dispatch("visibilitychange");
     flushProgress();
     assert.equal(record, null);
     assert.equal(posts, 0);

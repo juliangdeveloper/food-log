@@ -123,3 +123,14 @@ export function flushProgress() {
     /* ignore */
   }
 }
+
+export function bindProgressFlush(win, doc) {
+  try {
+    win.addEventListener("pagehide", () => flushProgress());
+    doc.addEventListener("visibilitychange", () => {
+      if (doc.visibilityState === "hidden") flushProgress();
+    });
+  } catch {
+    /* ignore */
+  }
+}

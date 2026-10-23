@@ -9,7 +9,7 @@ import {
   isImageDataUrl,
   parseFileId,
 } from "./model.js";
-import { backfillProgress, flushProgress, syncProgress } from "./progress.js";
+import { backfillProgress, bindProgressFlush, syncProgress } from "./progress.js";
 import {
   migrateEnvelope,
   openPhotoStore,
@@ -660,10 +660,7 @@ async function boot() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
-  window.addEventListener("pagehide", () => flushProgress());
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushProgress();
-  });
+  bindProgressFlush(window, document);
   ready = true;
   document.documentElement.dataset.ready = "1";
 }

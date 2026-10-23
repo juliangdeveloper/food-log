@@ -121,7 +121,7 @@ function postMeta(key, record, deps) {
 export function metaUpdate(slug, version, payload = {}, deps = {}) {
   try {
     if (isDemo(deps)) return null;
-    if (waitFor(deps) > 0) return null;
+    if (deps?.immediate !== true && waitFor(deps) > 0) return null;
     const storage = storageOf(deps);
     if (!storage) return null;
     const body = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
@@ -188,17 +188,20 @@ export function createMetaScheduler() {
     if (typeof timer.unref === "function") timer.unref();
   }
 
-  function writeQueued() {
+  function writeQueued(force) {
     timer = null;
     if (!queued) return;
-    const wait = waitFor(queued.deps);
-    if (wait > 0) {
-      later(writeQueued, wait);
-      return;
+    if (!force) {
+      const wait = waitFor(queued.deps);
+      if (wait > 0) {
+        later(() => writeQueued(false), wait);
+        return;
+      }
     }
     const job = queued;
     queued = null;
-    metaUpdate(job.slug, job.version, job.payload, job.deps);
+    const deps = force ? { ...job.deps, immediate: true } : job.deps;
+    metaUpdate(job.slug, job.version, job.payload, deps);
   }
 
   function scheduleMetaUpdate(slug, version, payload = {}, deps = {}) {
@@ -208,10 +211,10 @@ export function createMetaScheduler() {
       if (timer) return;
       const wait = waitFor(queued.deps);
       if (wait === 0) {
-        writeQueued();
+        writeQueued(false);
         return;
       }
-      later(writeQueued, wait);
+      later(() => writeQueued(false), wait);
     } catch {
       /* ignore */
     }
@@ -220,12 +223,12 @@ export function createMetaScheduler() {
   scheduleMetaUpdate.flush = function flushPending() {
     try {
       if (!queued) return;
-      if (waitFor(queued.deps) > 0) return;
+      if (isDemo(queued.deps)) return;
       if (timer) {
         clearTimeout(timer);
         timer = null;
       }
-      writeQueued();
+      writeQueued(true);
     } catch {
       /* ignore */
     }
