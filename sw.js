@@ -1,4 +1,4 @@
-const CACHE = "food-log-v0.2.1";
+const CACHE = "food-log-v0.2.2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,8 @@ const ASSETS = [
   "./js/storage.js",
   "./js/image.js",
   "./js/drive.js",
+  "./js/meta.js",
+  "./js/progress.js",
   "./js/app.js",
   "./js/vendor/idb-keyval.js",
   "./favicon.svg",

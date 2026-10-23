@@ -9,6 +9,7 @@ import {
   isImageDataUrl,
   parseFileId,
 } from "./model.js";
+import { backfillProgress, flushProgress, syncProgress } from "./progress.js";
 import {
   migrateEnvelope,
   openPhotoStore,
@@ -397,6 +398,7 @@ async function onSubmit(event) {
       }
       return;
     }
+    syncProgress(envelope);
     resetForm();
     await renderToday();
     toast("Comida guardada.");
@@ -419,6 +421,7 @@ async function onDelete(id) {
   const next = structuredClone(envelope);
   next.data.entries = next.data.entries.filter((entry) => entry.id !== id);
   if (!commit(next)) return;
+  syncProgress(envelope);
   await deletePhoto(existing?.image_key);
   await renderToday();
   toast("Comida eliminada.");
@@ -521,6 +524,7 @@ async function onImport(file) {
   for (const key of previousKeys) {
     if (!kept.has(key)) await deletePhoto(key);
   }
+  syncProgress(envelope);
   resetForm();
   await renderToday();
   renderOverrides();
@@ -592,6 +596,7 @@ async function boot() {
   if (stored.status === "invalid") {
     toast("No se pudo leer la bitácora guardada. Si guardas de nuevo, se reemplaza.");
   }
+  backfillProgress(envelope);
   $("version").textContent = `food-log v${APP_VERSION}`;
   todayDate.textContent = formatLongDate(new Date());
   await renderToday();
@@ -655,6 +660,10 @@ async function boot() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
+  window.addEventListener("pagehide", () => flushProgress());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushProgress();
+  });
   ready = true;
   document.documentElement.dataset.ready = "1";
 }

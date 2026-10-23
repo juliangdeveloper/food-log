@@ -8,6 +8,7 @@
   "background_color": "#f7d1e1",
   "theme_color": "#f7d1e1",
   "lang": "es-CO",
+  "version": "0.2.2",
   "icons": [
     {
       "src": "favicon.svg",
