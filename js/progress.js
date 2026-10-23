@@ -3,6 +3,15 @@ import { backfillMeta, scheduleMetaUpdate } from "./meta.js";
 
 const DAY_MS = 86400000;
 
+// Declared stat keys, in stored order. Monotonic counts and bests never decrease.
+export const STATS = [
+  { key: "days_logged", monotonic: true }, // days with a meal
+  { key: "entries_total", monotonic: true }, // meals saved
+  { key: "photo_entries", monotonic: true }, // meals with a photo
+  { key: "current_streak_days", monotonic: false }, // active streak
+  { key: "best_streak_days", monotonic: true }, // longest streak
+];
+
 // Stable ids. A logro stays once the count has been reached.
 export const ACHIEVEMENTS = [
   { id: "first_entry", met: (stats) => stats.entries_total >= 1 }, // 1 meal saved
@@ -87,9 +96,13 @@ function snapshot(envelope, now) {
   return { stats, logros: achievementIdsFor(stats) };
 }
 
+function metaDeps(deps = {}) {
+  return { ...deps, declared: STATS };
+}
+
 export function backfillProgress(envelope, deps = {}) {
   try {
-    return backfillMeta(APP_ID, APP_VERSION, snapshot(envelope, deps.now), deps);
+    return backfillMeta(APP_ID, APP_VERSION, snapshot(envelope, deps.now), metaDeps(deps));
   } catch {
     return null;
   }
@@ -97,7 +110,7 @@ export function backfillProgress(envelope, deps = {}) {
 
 export function syncProgress(envelope, deps = {}) {
   try {
-    scheduleMetaUpdate(APP_ID, APP_VERSION, snapshot(envelope, deps.now), deps);
+    scheduleMetaUpdate(APP_ID, APP_VERSION, snapshot(envelope, deps.now), metaDeps(deps));
   } catch {
     /* ignore */
   }
