@@ -4,10 +4,14 @@ const MAX_STATS = 20;
 const ID_RE = /^[a-z][a-z0-9_]*$/;
 const globalClock = { lastWriteAt: null };
 
+export const FASE = Object.freeze({ IDEA: 1, DEFINICION: 2, DISENO: 3, CONSTRUCCION: 4, VALIDACION: 5, LANZAMIENTO_Y_MANTENIMIENTO: 6, DESCARTADA: 7 });
+export const ESTADO_FASE = Object.freeze({ PENDIENTE: 0, EN_CURSO: 1, BLOQUEADA: 2, EN_REVISION: 3, COMPLETADA: 4 });
+export const TIPO_STAT = Object.freeze({ TOTAL_ACUMULADO: 'total_acumulado', MEJOR_MARCA: 'mejor_marca', VALOR_ACTUAL: 'valor_actual' });
+
 export const PROYECTO = {
   objetivo: 'En algún momento pensé que era una buena idea, pero tal vez te sirva de inspiración.',
-  fase: 7,
-  fase_estado: 4,
+  fase: FASE.DESCARTADA,
+  fase_estado: ESTADO_FASE.COMPLETADA,
   fases_completadas: 2
 };
 
@@ -17,12 +21,26 @@ function proyectoInt(n, lo, hi) {
   return typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
 }
 
+export function enumValido(enumeracion, valor) {
+  return Object.values(enumeracion).indexOf(valor) !== -1;
+}
+
+export function statConservaMaximo(tipo) {
+  return tipo === TIPO_STAT.TOTAL_ACUMULADO || tipo === TIPO_STAT.MEJOR_MARCA;
+}
+
+export function statsDeclarados(stats) {
+  if (Array.isArray(stats)) return stats;
+  if (!stats || typeof stats !== 'object') return [];
+  return Object.keys(stats).map(function (key) { return { key: key, tipo: stats[key] && stats[key].tipo }; });
+}
+
 export function metaProyecto(p) {
   try {
     if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
     const o = p.objetivo;
     if (typeof o !== 'string' || !o.trim() || Array.from(o).length > 140) return null;
-    if (!proyectoInt(p.fase, 1, 7) || !proyectoInt(p.fase_estado, 0, 4) || !proyectoInt(p.fases_completadas, 0, 6)) return null;
+    if (!enumValido(FASE, p.fase) || !enumValido(ESTADO_FASE, p.fase_estado) || !proyectoInt(p.fases_completadas, 0, FASE.LANZAMIENTO_Y_MANTENIMIENTO)) return null;
     return { objetivo: o, fase: p.fase, fase_estado: p.fase_estado, fases_completadas: p.fases_completadas };
   } catch (e) {
     return null;
@@ -86,8 +104,7 @@ function plainVersion(version) {
 }
 
 function declaredList(declared) {
-  if (!Array.isArray(declared)) return [];
-  return declared.slice(0, MAX_STATS);
+  return statsDeclarados(declared).slice(0, MAX_STATS);
 }
 
 function mergeStats(previous, incoming, declared) {
@@ -97,13 +114,13 @@ function mergeStats(previous, incoming, declared) {
   const seen = new Set();
   for (const item of declaredList(declared)) {
     const key = typeof item === "string" ? item : item?.key;
-    const monotonic = typeof item === "object" && item?.monotonic === true;
+    const conservaMaximo = typeof item === "object" && statConservaMaximo(item?.tipo);
     if (typeof key !== "string" || !ID_RE.test(key) || seen.has(key)) continue;
     seen.add(key);
     const oldValue = typeof prev[key] === "number" && Number.isFinite(prev[key]) ? prev[key] : undefined;
     const newValue = typeof next[key] === "number" && Number.isFinite(next[key]) ? next[key] : undefined;
     let value;
-    if (newValue !== undefined && oldValue !== undefined && monotonic) value = Math.max(oldValue, newValue);
+    if (newValue !== undefined && oldValue !== undefined && conservaMaximo) value = Math.max(oldValue, newValue);
     else if (newValue !== undefined) value = newValue;
     else if (oldValue !== undefined) value = oldValue;
     else continue;

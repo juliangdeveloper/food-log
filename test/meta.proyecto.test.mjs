@@ -25,7 +25,7 @@ test.after(() => metaSetProyecto(null));
 test("PROYECTO is a valid block within the shared ranges", () => {
   assert.deepEqual(metaProyecto(PROYECTO), { ...PROYECTO });
   assert.ok(Array.from(PROYECTO.objetivo).length <= 140);
-  const keys = STATS.map((s) => (typeof s === "string" ? s : s.key));
+  const keys = Object.keys(STATS);
   assert.equal(keys.some((k) => k === "proyecto" || String(k).startsWith("fase")), false);
 });
 

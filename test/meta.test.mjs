@@ -108,7 +108,7 @@ test("an old save without the meta key backfills counts and achievements", () =>
   assert.equal(record.slug, "food-log");
   assert.equal(record.version, APP_VERSION);
   assert.equal(record.version.startsWith("v"), false);
-  assert.deepEqual(Object.keys(record.stats), STATS.map((item) => item.key));
+  assert.deepEqual(Object.keys(record.stats), Object.keys(STATS));
   assert.equal(record.updatedAt, now.toISOString());
   assert.deepEqual(record.stats, {
     days_logged: 2,
@@ -464,17 +464,17 @@ test("streaks use local days, and achievements follow the count thresholds", () 
 });
 
 test("the helper writes only the first 20 declared stats, in declared order", () => {
-  assert.ok(STATS.length <= 20);
+  assert.ok(Object.keys(STATS).length <= 20);
   assert.deepEqual(
-    STATS.filter((item) => item.monotonic).map((item) => item.key),
+    Object.keys(STATS).filter((key) => STATS[key].tipo !== "valor_actual"),
     ["days_logged", "entries_total", "photo_entries", "best_streak_days"],
   );
-  assert.equal(STATS.find((item) => item.key === "current_streak_days").monotonic, false);
+  assert.equal(STATS.current_streak_days.tipo, "valor_actual");
   const declared = [];
   const stats = { not_declared: 7 };
   for (let i = 0; i < 21; i += 1) {
     const key = `stat_${String(i).padStart(2, "0")}`;
-    declared.push({ key, monotonic: false });
+    declared.push({ key, tipo: "valor_actual" });
     stats[key] = i;
   }
   const storage = memoryStorage();

@@ -1,15 +1,15 @@
 import { APP_ID, APP_VERSION } from "./config.js";
-import { backfillMeta, scheduleMetaUpdate } from "./meta.js";
+import { TIPO_STAT, backfillMeta, scheduleMetaUpdate } from "./meta.js";
 
 const DAY_MS = 86400000;
 
-export const STATS = [
-  { key: "days_logged", monotonic: true },
-  { key: "entries_total", monotonic: true },
-  { key: "photo_entries", monotonic: true },
-  { key: "current_streak_days", monotonic: false },
-  { key: "best_streak_days", monotonic: true },
-];
+export const STATS = Object.freeze({
+  days_logged: { tipo: TIPO_STAT.TOTAL_ACUMULADO, unidad: "días con registros" },
+  entries_total: { tipo: TIPO_STAT.TOTAL_ACUMULADO, unidad: "comidas registradas" },
+  photo_entries: { tipo: TIPO_STAT.TOTAL_ACUMULADO, unidad: "comidas registradas con foto" },
+  current_streak_days: { tipo: TIPO_STAT.VALOR_ACTUAL, unidad: "días seguidos con registros hasta hoy" },
+  best_streak_days: { tipo: TIPO_STAT.MEJOR_MARCA, unidad: "días seguidos con registros" }
+});
 
 export const ACHIEVEMENTS = [
   { id: "first_entry", met: (stats) => stats.entries_total >= 1 },
