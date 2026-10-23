@@ -4,6 +4,47 @@ const MAX_STATS = 20;
 const ID_RE = /^[a-z][a-z0-9_]*$/;
 const globalClock = { lastWriteAt: null };
 
+// Project status, set by hand and bumped with the version. Never computed from play.
+// fase 1-6: Idea, Definición, Diseño, Construcción, Validación, Lanzamiento y mantenimiento.
+// fase_estado 0-4: pendiente, en curso, bloqueada, en revisión, completada.
+export const PROYECTO = {
+  objetivo: 'Registrar cada comida en segundos, con foto opcional, sin conexión y con respaldo completo del historial.',
+  fase: 5,
+  fase_estado: 1,
+  fases_completadas: 4
+};
+
+let proyectoSource = PROYECTO;
+
+function proyectoInt(n, lo, hi) {
+  return typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
+}
+
+// Clean copy of a proyecto block, or null when any field is missing or out of range.
+export function metaProyecto(p) {
+  try {
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+    const o = p.objetivo;
+    if (typeof o !== 'string' || !o.trim() || Array.from(o).length > 140) return null;
+    if (!proyectoInt(p.fase, 1, 6) || !proyectoInt(p.fase_estado, 0, 4) || !proyectoInt(p.fases_completadas, 0, 6)) return null;
+    return { objetivo: o, fase: p.fase, fase_estado: p.fase_estado, fases_completadas: p.fases_completadas };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Tests only: swap the block the writer uses (null restores PROYECTO).
+export function metaSetProyecto(p) {
+  proyectoSource = p === null ? PROYECTO : p;
+}
+
+// Adds the current proyecto block to a record being written, when it is valid.
+function withProyecto(record) {
+  const p = metaProyecto(proyectoSource);
+  if (p) record.proyecto = p;
+  return record;
+}
+
 export function metaStorageKey(slug) {
   return `meta.v1.${slug}`;
 }
@@ -145,6 +186,7 @@ export function metaUpdate(slug, version, payload = {}, deps = {}) {
       logros,
       hitos,
     };
+    withProyecto(record);
     storage.setItem(key, JSON.stringify(record));
     clockOf(deps).lastWriteAt = nowMs(deps);
     postMeta(key, record, deps);
