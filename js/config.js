@@ -1,9 +1,9 @@
-// food-log v0.2.1 — static config. No secrets belong here.
+// food-log v0.2.4 — static config. No secrets belong here.
 export const APP_ID = "food-log";
 // New envelopes are schema 2 (photo blobs live in IndexedDB). Schema 1 is still read and migrated.
 export const SCHEMA_VERSION = 2;
 export const SUPPORTED_SCHEMA_VERSIONS = [1, 2];
-export const APP_VERSION = "0.2.1";
+export const APP_VERSION = "0.2.4";
 export const STORAGE_KEY = "food-log.save.v1";
 
 // Tabla nutrición overrides Sheet. Empty by default: set the file id in Ajustes.

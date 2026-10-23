@@ -123,9 +123,10 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
       styles: [...document.querySelectorAll("link[rel=stylesheet]")].map((link) => link.getAttribute("href")),
       overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       save: JSON.parse(localStorage.getItem("food-log.save.v1")),
+      meta: JSON.parse(localStorage.getItem("meta.v1.food-log")),
     }));
     assert.equal(shell.lang, "es-CO");
-    assert.equal(shell.version, "food-log v0.2.1");
+    assert.equal(shell.version, "food-log v0.2.4");
     assert.match(shell.drive, /client id/i);
     assert.deepEqual(shell.styles, ["css/styles.css"]);
     assert.equal(shell.scripts.some((src) => /googleapis|accounts\.google/.test(src)), false);
@@ -136,6 +137,17 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.equal(shell.save.data.nutrition.overrides_file_id, null);
     assert.equal(shell.save.data.meals.file_id, null);
     assert.deepEqual(shell.save.data.settings, {});
+    assert.equal(shell.meta.v, 1);
+    assert.equal(shell.meta.slug, "food-log");
+    assert.equal(shell.meta.version, "0.2.4");
+    assert.deepEqual(shell.meta.stats, {
+      days_logged: 0,
+      entries_total: 0,
+      photo_entries: 0,
+      current_streak_days: 0,
+      best_streak_days: 0,
+    });
+    assert.deepEqual(shell.meta.logros, []);
 
     await page.click("#save-entry");
     const emptyError = await page.$eval("#form-error", (el) => el.textContent);
@@ -150,6 +162,13 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     await page.type("#kcal", "850,5");
     await page.click("#save-entry");
     await page.waitForFunction(() => document.querySelectorAll("#today-list .entry").length === 1);
+    await page.waitForFunction(() => {
+      try {
+        return JSON.parse(localStorage.getItem("meta.v1.food-log")).stats.entries_total === 1;
+      } catch {
+        return false;
+      }
+    });
 
     const textEntry = await page.evaluate(() => {
       const save = JSON.parse(localStorage.getItem("food-log.save.v1"));
@@ -157,6 +176,7 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
         entry: save.data.entries[0],
         card: document.querySelector("#today-list .entry").innerText,
         description: document.getElementById("description").value,
+        meta: localStorage.getItem("meta.v1.food-log"),
       };
     });
     assert.equal(textEntry.entry.description, "Bandeja paisa");
@@ -171,6 +191,14 @@ test("food log works in the browser for both entry modes", { timeout: 120000 }, 
     assert.match(textEntry.card, /Almuerzo/);
     assert.match(textEntry.card, /850,5 kcal/);
     assert.equal(textEntry.description, "");
+    const progress = JSON.parse(textEntry.meta);
+    assert.equal(progress.stats.entries_total, 1);
+    assert.equal(progress.stats.photo_entries, 0);
+    assert.equal(progress.stats.days_logged, 1);
+    assert.deepEqual(progress.logros, ["first_entry"]);
+    for (const secret of ["Bandeja", "aguacate", "850", textEntry.entry.id]) {
+      assert.equal(textEntry.meta.includes(secret), false, secret);
+    }
 
     await page.click("#today-list .btn-danger");
     await page.waitForSelector("#confirm-dialog[open]");
