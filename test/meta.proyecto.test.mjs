@@ -16,7 +16,7 @@ function memoryStorage(initial = {}) {
 }
 
 function deps(storage) {
-  return { storage, clock: { lastWriteAt: null }, immediate: true, demo: false };
+  return { storage, clock: { lastWriteAt: null }, immediate: true };
 }
 
 test.beforeEach(() => metaSetProyecto(null));

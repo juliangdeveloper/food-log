@@ -16,13 +16,9 @@ export const PROYECTO = {
   fases_completadas: 2,
   tipo: TIPO_PROYECTO.AREA,
   aportes: [
-    { id: 'programacion', aporte: 2, fuente: 'creacion' },
-    { id: 'persistencia', aporte: 2, fuente: 'creacion' },
-    { id: 'ux', aporte: 2, fuente: 'creacion' },
-    { id: 'datos', aporte: 1, fuente: 'creacion' },
-    { id: 'disciplina', aporte: 2, fuente: 'uso' },
-    { id: 'nutricion', aporte: 2, fuente: 'uso' },
-    { id: 'perseverancia', aporte: 1, fuente: 'uso' }
+    { stat: 'Programación', exp: 16, fuente: 'creacion' },
+    { stat: 'Diseño', exp: 4, fuente: 'creacion' },
+    { stat: 'Nutrición', exp: 20, fuente: 'uso' }
   ]
 };
 
@@ -46,6 +42,9 @@ export function statsDeclarados(stats) {
   return Object.keys(stats).map(function (key) { return { key: key, tipo: stats[key] && stats[key].tipo }; });
 }
 
+const APORTE_STAT_MAX = 32;
+const APORTE_EXP_MAX = 99;
+
 function aportesValidos(lista) {
   if (!Array.isArray(lista)) return null;
   const out = [];
@@ -53,17 +52,17 @@ function aportesValidos(lista) {
   for (let i = 0; i < lista.length; i++) {
     const it = lista[i];
     if (!it || typeof it !== 'object' || Array.isArray(it)) return null;
-    const id = it.id;
+    const stat = it.stat;
+    const exp = it.exp;
     const fuente = it.fuente;
-    const aporte = it.aporte;
-    if (typeof id !== 'string' || !/^[a-z][a-z0-9]*$/.test(id)) return null;
+    if (typeof stat !== 'string' || !stat.trim() || stat !== stat.trim() || Array.from(stat).length > APORTE_STAT_MAX) return null;
     if (fuente !== 'creacion' && fuente !== 'uso') return null;
-    if (!proyectoInt(aporte, 1, 3)) return null;
-    const key = id + '\n' + fuente;
+    if (!(proyectoInt(exp, 1, APORTE_EXP_MAX))) return null;
+    const key = stat + '\n' + fuente;
     if (seen[key]) return null;
     if (Object.keys(it).length !== 3) return null;
     seen[key] = true;
-    out.push({ id: id, aporte: aporte, fuente: fuente });
+    out.push({ stat: stat, exp: exp, fuente: fuente });
   }
   return out;
 }
@@ -91,6 +90,36 @@ export function metaProyecto(p) {
 
 export function metaSetProyecto(p) {
   proyectoSource = p === null ? PROYECTO : p;
+}
+
+export function metaDeclararProyecto(slug, version) {
+  try {
+    const store = globalThis.localStorage;
+    if (!store || !slug) return null;
+    const clave = "meta.v1." + slug;
+    const raw = store.getItem(clave);
+    let base = null;
+    if (raw != null && raw !== "") {
+      try {
+        const previo = JSON.parse(raw);
+        if (previo && typeof previo === "object" && !Array.isArray(previo) && previo.v === 1 && previo.slug === slug) base = previo;
+      } catch (e) {
+        base = null;
+      }
+      if (!base) store.setItem(clave + ".corrupt", String(raw));
+    }
+    if (!base) base = { v: 1, slug: slug, version: String(version == null ? "" : version).replace(/^[vV]/, ""), updatedAt: new Date().toISOString(), stats: {}, logros: [], hitos: {} };
+    const p = metaProyecto(proyectoSource);
+    if (p) base.proyecto = p;
+    const texto = JSON.stringify(base);
+    if (texto !== raw) {
+      store.setItem(clave, texto);
+      if (typeof window !== "undefined" && window.parent && window.parent !== window) window.parent.postMessage({ type: "meta", key: clave, data: base }, location.origin);
+    }
+    return base;
+  } catch (e) {
+    return null;
+  }
 }
 
 function withProyecto(record) {
@@ -124,20 +153,6 @@ function waitFor(deps) {
   const clock = clockOf(deps);
   if (clock.lastWriteAt == null) return 0;
   return Math.max(0, MIN_INTERVAL_MS - (nowMs(deps) - clock.lastWriteAt));
-}
-
-function isDemo(deps) {
-  if (deps && deps.demo === true) return true;
-  if (deps && deps.demo === false) return false;
-  try {
-    const search = deps && Object.prototype.hasOwnProperty.call(deps, "search")
-      ? deps.search
-      : (typeof location !== "undefined" ? location.search : "");
-    const params = new URLSearchParams(String(search || ""));
-    return params.get("demo") === "1" || params.get("preview") === "1";
-  } catch {
-    return false;
-  }
 }
 
 function plainVersion(version) {
@@ -213,7 +228,6 @@ function postMeta(key, record, deps) {
 
 export function metaUpdate(slug, version, payload = {}, deps = {}) {
   try {
-    if (isDemo(deps)) return null;
     if (deps?.immediate !== true && waitFor(deps) > 0) return null;
     const storage = storageOf(deps);
     if (!storage) return null;
@@ -250,7 +264,6 @@ export function metaUpdate(slug, version, payload = {}, deps = {}) {
 
 export function backfillMeta(slug, version, payload = {}, deps = {}) {
   try {
-    if (isDemo(deps)) return null;
     const storage = storageOf(deps);
     if (!storage) return null;
     const key = metaStorageKey(slug);
@@ -298,7 +311,6 @@ export function createMetaScheduler() {
 
   function scheduleMetaUpdate(slug, version, payload = {}, deps = {}) {
     try {
-      if (isDemo(deps)) return;
       queued = { slug, version, payload, deps: deps || {} };
       if (timer) return;
       const wait = waitFor(queued.deps);
@@ -314,7 +326,6 @@ export function createMetaScheduler() {
   scheduleMetaUpdate.flush = function flushPending() {
     try {
       if (!queued) return;
-      if (isDemo(queued.deps)) return;
       if (timer) {
         clearTimeout(timer);
         timer = null;

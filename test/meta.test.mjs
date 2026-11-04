@@ -526,40 +526,6 @@ test("monotonic counts and bests keep the higher value", () => {
   assert.deepEqual(second.logros, ["first_entry"]);
 });
 
-test("demo and preview modes do not write or post", () => {
-  const now = new Date("2026-10-23T18:00:00.000Z");
-  const rawSave = JSON.stringify(envelope([
-    entry("2026-10-23T12:00:00.000Z", { description: "TOKEN_FOOD", image_data_url: GIF }),
-  ]));
-  for (const search of ["?demo=1", "?preview=1", "?page=1&demo=1"]) {
-    const storage = memoryStorage({
-      [STORAGE_KEY]: rawSave,
-      [KEY]: "{not json",
-    });
-    let posts = 0;
-    const view = {
-      location: { origin: "https://portfolio.test" },
-      parent: { postMessage() { posts += 1; } },
-    };
-    const clock = freshClock();
-    const win = eventTarget();
-    const doc = eventTarget();
-    bindProgressFlush(win, doc);
-    const record = backfillProgress(JSON.parse(rawSave), { storage, search, clock, now, window: view });
-    syncProgress(JSON.parse(rawSave), { storage, search, clock, now, window: view });
-    win.dispatch("pagehide");
-    doc.visibilityState = "hidden";
-    doc.dispatch("visibilitychange");
-    flushProgress();
-    assert.equal(record, null);
-    assert.equal(posts, 0);
-    assert.equal(storage.getItem(KEY), "{not json");
-    assert.equal(storage.getItem(`${KEY}.corrupt`), null);
-    assert.equal(storage.getItem(STORAGE_KEY), rawSave);
-    assert.equal(storage.writes.length, 0);
-  }
-});
-
 test("load and play leave the saved meals byte-identical", () => {
   const now = atLocal(2026, 10, 21, 18);
   const saved = envelope([

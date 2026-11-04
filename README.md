@@ -16,6 +16,7 @@
 
 ## Stack
 JavaScript vanilla (módulos ES), `localStorage` para los registros e IndexedDB para las fotos, con service worker para uso offline. Sin servidor ni bundler.
+Al abrirse guarda el progreso en `localStorage` (`meta.v1.food-log`), que lee el [portafolio](https://juliangdeveloper.github.io/).
 
 ```
 python3 -m http.server 8000   # abrir http://localhost:8000
