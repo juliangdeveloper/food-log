@@ -591,5 +591,5 @@ test("load and play leave the saved meals byte-identical", () => {
   assert.equal(meta.includes("987654"), false);
   assert.equal(meta.includes("R0lGODlh"), false);
   assert.equal(meta.includes("file-token"), false);
-  assert.ok(meta.length < rawSave.length);
+  assert.equal(meta.includes("image_data_url"), false);
 });
