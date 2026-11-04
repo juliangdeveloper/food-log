@@ -1,4 +1,4 @@
-import { APP_VERSION, GOOGLE_CLIENT_ID, STORAGE_KEY } from "./config.js";
+import { APP_ID, APP_VERSION, GOOGLE_CLIENT_ID, STORAGE_KEY } from "./config.js";
 import { pickSpreadsheet } from "./drive.js";
 import { readOriginalImageFile } from "./image.js";
 import {
@@ -10,6 +10,7 @@ import {
   parseFileId,
 } from "./model.js";
 import { backfillProgress, bindProgressFlush, syncProgress } from "./progress.js";
+import { metaDeclararProyecto } from "./meta.js";
 import {
   migrateEnvelope,
   openPhotoStore,
@@ -593,6 +594,7 @@ async function boot() {
     toast("No se pudo leer la bitácora guardada. Si guardas de nuevo, se reemplaza.");
   }
   backfillProgress(envelope);
+  metaDeclararProyecto(APP_ID, APP_VERSION);
   $("version").textContent = `food-log v${APP_VERSION}`;
   todayDate.textContent = formatLongDate(new Date());
   await renderToday();
